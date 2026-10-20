@@ -49,8 +49,13 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int uSpriteSize;
     private final int uSpriteResolution;
     private final int uSpriteTexture;
-    private final int uSpriteZ;
     private final int uSpriteFog;
+    private final int uSpriteFocal;
+    private final int uSpriteCam;
+    private final int uSpriteYaw;
+    private final int uSpritePitch;
+    private final int uSpriteRight;
+    private final int uSpriteUp;
 
     private final int worldTexture;
     private final int atlasTexture;
@@ -176,8 +181,13 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uSpriteSize = uniform(spriteProgram, "uSize");
         this.uSpriteResolution = uniform(spriteProgram, "uResolution");
         this.uSpriteTexture = uniform(spriteProgram, "uSprite");
-        this.uSpriteZ = uniform(spriteProgram, "uZ");
         this.uSpriteFog = uniform(spriteProgram, "uFogDist");
+        this.uSpriteFocal = uniform(spriteProgram, "uFocal");
+        this.uSpriteCam = uniform(spriteProgram, "uCamPos");
+        this.uSpriteYaw = uniform(spriteProgram, "uYaw");
+        this.uSpritePitch = uniform(spriteProgram, "uPitch");
+        this.uSpriteRight = uniform(spriteProgram, "uRight");
+        this.uSpriteUp = uniform(spriteProgram, "uUp");
         this.spriteTexture = GlUtil.playerSpriteTexture("player.png");
 
         float[] quad =
@@ -278,12 +288,24 @@ public final class GpuWorldRenderer implements AutoCloseable
         double cosPitch = Math.cos(scaledPitch);
         double sinPitch = Math.sin(scaledPitch);
 
-        float baseWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE;
-        float baseHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE;
+        // World size, chosen so the projected size matches the old sprite
+        // (baseWidth pixels at the focal distance).
+        float worldWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
+        float worldHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
 
         glUseProgram(spriteProgram);
         glUniform2f(uSpriteResolution, width, height);
         glUniform1f(uSpriteFog, 50.0f);
+        glUniform1f(uSpriteFocal, focal);
+        glUniform3f(uSpriteCam, camX, camY, camZ);
+        glUniform1f(uSpriteYaw, scaledYaw);
+        glUniform1f(uSpritePitch, scaledPitch);
+        glUniform3f(uSpriteRight, (float) cosYaw, 0.0f, (float) -sinYaw);
+        glUniform3f(uSpriteUp,
+                (float) (-sinYaw * sinPitch),
+                (float) -cosPitch,
+                (float) (-cosYaw * sinPitch));
+
         GlUtil.bindTexture(0, spriteTexture, GL_TEXTURE_2D);
         glUniform1i(uSpriteTexture, 0);
 
@@ -299,37 +321,11 @@ public final class GpuWorldRenderer implements AutoCloseable
             if (entity.getEntityId() == 0 || entity.getLocation() == null)
                 continue;
 
-            double diffX = entity.getLocation().getX() - camX;
-            double diffY = entity.getLocation().getY() - camY;
-            double diffZ = entity.getLocation().getZ() - camZ;
-
-            if (diffY == 0.0)
-                diffY = 0.005;
-
-            // World-space billboard: the sprite is anchored to the player's
-            // position, so it moves with the terrain when you look up or down
-            // instead of staying pinned to the screen.
-            double xx = cosYaw * diffX - sinYaw * diffZ;
-            double zz = sinYaw * diffX + cosYaw * diffZ;
-            double yy = cosPitch * diffY - sinPitch * zz;
-            zz = sinPitch * diffY + cosPitch * zz;
-
-            if (zz < 0.0)
-                continue;
-
-            // Size by the distance from the camera (rotation-invariant), not
-            // the view-axis depth. A billboard keeps its world size while the
-            // camera pitches; only its projected position moves.
-            double distance = Math.sqrt(xx * xx + yy * yy + zz * zz);
-            if (distance < 0.001)
-                continue;
-
-            float screenX = (float) (xx * focal / zz) + width * 0.5f;
-            float screenY = (float) (yy * focal / zz) + height * 0.5f;
-
-            glUniform2f(uSpriteCenter, screenX, screenY);
-            glUniform2f(uSpriteSize, baseWidth / (float) distance, baseHeight / (float) distance);
-            glUniform1f(uSpriteZ, (float) zz);
+            glUniform3f(uSpriteCenter,
+                    entity.getLocation().getX(),
+                    entity.getLocation().getY(),
+                    entity.getLocation().getZ());
+            glUniform2f(uSpriteSize, worldWidth, worldHeight);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 

@@ -1,12 +1,12 @@
 #version 330 core
 
-in vec2 vUV;
+in vec2  vUV;
+in float vDepth;
 
 layout(location = 0) out vec4  oColor;
 layout(location = 1) out float oDepth;
 
 uniform sampler2D uSprite;
-uniform float uZ;
 uniform float uFogDist;
 
 void main()
@@ -19,6 +19,6 @@ void main()
         discard;
 
     oColor = vec4(texel.rgb, 1.0);
-    oDepth = uZ;
-    gl_FragDepth = clamp(uZ / uFogDist, 0.0, 1.0);
+    oDepth = vDepth;
+    gl_FragDepth = clamp(vDepth / uFogDist, 0.0, 1.0);
 }
