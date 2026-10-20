@@ -1,10 +1,9 @@
 #version 330 core
 
-// World-space billboard: the quad is built from the camera's right/up vectors
-// and each corner is projected individually, so the rasteriser applies
-// perspective correction (no fisheye stretching at the screen edges).
+// Doom-style sprite quad: vertical in world space, turned to face the camera
+// only around the vertical axis, feet anchored by the CPU side.
 
-layout(location = 0) in vec2 aPos;   // -0.5 .. 0.5
+layout(location = 0) in vec2 aPos;   // x: left..right, y: top..bottom
 
 uniform vec3  uCenter;
 uniform vec2  uSize;                 // world units
@@ -37,13 +36,15 @@ void main()
     float yy = cp * rel.y - sp * zz;
     zz = sp * rel.y + cp * zz;
 
-    vec2 pixel = vec2(xx * uFocal / zz + uResolution.x * 0.5,
-                      yy * uFocal / zz + uResolution.y * 0.5);
+    // Real clip-space position with w = view depth. Dividing here and passing
+    // w = 1 would make UV/depth interpolation affine and warp the sprite when
+    // the top and bottom corners have different depths (looking up or down).
+    gl_Position = vec4(xx * uFocal * 2.0 / uResolution.x,
+                       -yy * uFocal * 2.0 / uResolution.y,
+                       0.0,
+                       zz);
 
-    gl_Position = vec4(pixel.x / uResolution.x * 2.0 - 1.0,
-                       1.0 - pixel.y / uResolution.y * 2.0,
-                       0.0, 1.0);
-
-    vUV = vec2(1.0 - (aPos.x + 0.5), aPos.y + 0.5);
+    // Upright and unmirrored: the texture's left column is the sprite's left.
+    vUV = vec2(aPos.x + 0.5, aPos.y + 0.5);
     vDepth = zz;
 }
