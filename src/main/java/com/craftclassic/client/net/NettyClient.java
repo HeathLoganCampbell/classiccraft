@@ -9,31 +9,63 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
 public final class NettyClient {
-    static final String HOST = "127.0.0.1";
+    public static final String DEFAULT_HOST = "127.0.0.1";
+    public static final int DEFAULT_PORT = RetroCraftServer.PORT;
+
+    private final String host;
+    private final int port;
+    private final String username;
 
     public Channel serverChannel;
 
     public NettyClient()
     {
+        this(DEFAULT_HOST, DEFAULT_PORT, "Player");
     }
 
-    public void run()
+    public NettyClient(String host, int port, String username)
+    {
+        this.host = host;
+        this.port = port;
+        this.username = username;
+    }
+
+    /**
+     * Connects without throwing. Returns false when no server is listening,
+     * which lets the GPU client fall back to single-player.
+     */
+    public boolean connect()
     {
         EventLoopGroup group = new NioEventLoopGroup();
         Bootstrap b = new Bootstrap();
 
-        b.group(group) // Set EventLoopGroup to handle all eventsf for client.
-                .channel(NioSocketChannel.class)// Use NIO to accept new connections.
-                .handler(new ClientNettyPipeline());
+        b.group(group)
+                .channel(NioSocketChannel.class)
+                .handler(new ClientNettyPipeline(this.username));
 
-        // Start the client.
         try {
-            ChannelFuture f = b.connect(HOST, RetroCraftServer.PORT).sync();
+            ChannelFuture f = b.connect(this.host, this.port).sync();
+            if (!f.isSuccess()) {
+                group.shutdownGracefully();
+                return false;
+            }
             this.serverChannel = f.channel();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
+            return true;
+        } catch (Exception e) {
+            group.shutdownGracefully();
+            return false;
         }
+    }
+
+    public void run()
+    {
+        if (!connect())
+            throw new RuntimeException("Could not connect to " + this.host + ":" + this.port);
+    }
+
+    public boolean isConnected()
+    {
+        return this.serverChannel != null && this.serverChannel.isActive();
     }
 
     public Channel getServerChannel()
@@ -43,7 +75,8 @@ public final class NettyClient {
 
     public void sendPacket(Packet packet)
     {
-        this.getServerChannel().writeAndFlush(packet);
+        if (this.isConnected())
+            this.serverChannel.writeAndFlush(packet);
     }
 }
 

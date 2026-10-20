@@ -14,6 +14,18 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 
 public class ClientNettyPipeline extends ChannelInitializer<SocketChannel>
 {
+    private final String username;
+
+    public ClientNettyPipeline()
+    {
+        this("Player");
+    }
+
+    public ClientNettyPipeline(String username)
+    {
+        this.username = username;
+    }
+
     @Override
     protected void initChannel(SocketChannel channel) throws Exception
     {
@@ -32,6 +44,6 @@ public class ClientNettyPipeline extends ChannelInitializer<SocketChannel>
                 .addLast("decoder", new PacketDecoder(PacketRegistry.INSTANCE))
                 .addLast("encoder", new PacketEncoder())
 
-                .addLast("handler", new ClientProcessingHandler());
+                .addLast("handler", new ClientProcessingHandler(this.username));
     }
 }

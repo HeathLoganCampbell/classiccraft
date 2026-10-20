@@ -7,7 +7,7 @@
     <groupId>org.example</groupId>
     <artifactId>classiccraft</artifactId>
     <name>ClassicCraft</name>
-    <version>1.0</version>
+    <version>1.1</version>
 
     <dependencies>
         <dependency>
@@ -39,6 +39,17 @@
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
             <version>${lwjgl.version}</version>
+        </dependency>
+
+        <!--
+            Tests cover the headless simulation and network layers. The renderers
+            need a window/GL context, so they are exercised by run-gpu.sh, not here.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -184,6 +195,11 @@
                     <release>18</release>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
         </plugins>
     </build>
 
@@ -192,6 +208,7 @@
         <maven.compiler.target>18</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lwjgl.version>3.3.6</lwjgl.version>
+        <junit.version>5.10.2</junit.version>
     </properties>
 
 </project>

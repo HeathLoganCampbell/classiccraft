@@ -1,6 +1,6 @@
 package com.craftclassic.common.network.pipeline.handlers;
 
-import com.craftclassic.client.Minecraft;
+import com.craftclassic.common.network.ClientBridge;
 import com.craftclassic.common.blocks.Block;
 import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.network.packet.Packet;
@@ -11,6 +11,18 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 public class ClientProcessingHandler extends SimpleChannelInboundHandler<Packet>
 {
+    private final String username;
+
+    public ClientProcessingHandler()
+    {
+        this("Player");
+    }
+
+    public ClientProcessingHandler(String username)
+    {
+        this.username = username;
+    }
+
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
     {
@@ -27,13 +39,24 @@ public class ClientProcessingHandler extends SimpleChannelInboundHandler<Packet>
     @Override
     public void channelActive(ChannelHandlerContext ctx)
     {
-        PlayerConnectPacket playerConnectPacket = new PlayerConnectPacket("Cookie Monster");
+        PlayerConnectPacket playerConnectPacket = new PlayerConnectPacket(this.username);
         ctx.writeAndFlush(playerConnectPacket);
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, Packet packet)
     {
+        ClientBridge.View view = ClientBridge.view;
+        if(view == null)
+            return;
+
+        if(packet instanceof ChatMessagePacket)
+        {
+            ChatMessagePacket chat = (ChatMessagePacket) packet;
+            view.onChatMessage(chat.getSender(), chat.getMessage());
+            return;
+        }
+
         if(packet instanceof EntitySpawnPacket)
         {
             EntitySpawnPacket entitySpawnPacket = (EntitySpawnPacket) packet;
@@ -45,17 +68,17 @@ public class ClientProcessingHandler extends SimpleChannelInboundHandler<Packet>
             }
 
             Entity bunny = new Entity("Bunny", entitySpawnPacket.getEntityId());
-            bunny.setLocation(new Location(Minecraft.INSTANCE.world,
-                    (float) entitySpawnPacket.getZ(),
+            bunny.setLocation(new Location(view.getWorld(),
+                    (float) entitySpawnPacket.getX(),
                     (float) entitySpawnPacket.getY(),
                     (float) entitySpawnPacket.getZ()));
-            Minecraft.INSTANCE.world.addEntity(bunny);
+            view.addEntity(bunny);
         }
 
         if(packet instanceof EntityPositionPacket)
         {
             EntityPositionPacket entityPositionPacket = (EntityPositionPacket) packet;
-            for (Entity entity : Minecraft.INSTANCE.world.getEntities())
+            for (Entity entity : view.getWorld().getEntities())
             {
                 if (entity.getEntityId() == entityPositionPacket.getEntityId())
                 {
@@ -73,14 +96,14 @@ public class ClientProcessingHandler extends SimpleChannelInboundHandler<Packet>
             BlockPlacePacket blockPlacePacket = (BlockPlacePacket) packet;
 
             Block block = Block.getBlockById(blockPlacePacket.getBlockId());
-            Minecraft.INSTANCE.world.setBlock(blockPlacePacket.getX(), blockPlacePacket.getY(), blockPlacePacket.getZ(), block);
+            view.getWorld().setBlock(blockPlacePacket.getX(), blockPlacePacket.getY(), blockPlacePacket.getZ(), block);
         }
 
         if(packet instanceof BlockBreakPacket)
         {
             BlockBreakPacket blockBreakPacket = (BlockBreakPacket) packet;
 
-            Minecraft.INSTANCE.world.setBlock(blockBreakPacket.getX(), blockBreakPacket.getY(), blockBreakPacket.getZ(), Block.AIR);
+            view.getWorld().setBlock(blockBreakPacket.getX(), blockBreakPacket.getY(), blockBreakPacket.getZ(), Block.AIR);
         }
     }
 }

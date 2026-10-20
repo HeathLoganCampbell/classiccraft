@@ -37,3 +37,11 @@ including the trade-offs that are now visible with hindsight.
 | [0015](0015-render-players-as-sprites.md) | Render other players as 2D sprites | Accepted |
 | [0016](0016-gpu-raycast-backend.md) | Optional GPU raycast backend | Accepted (experimental) |
 | [0017](0017-server-fixed-20-tps.md) | Run the server at a fixed 20 TPS | Accepted |
+| [0018](0018-allow-graphics-libraries.md) | Allow graphics libraries in ClassicCraft | Accepted |
+| [0019](0019-internal-resolution-413x260.md) | Raise the internal resolution to 413x260 | Accepted |
+| [0020](0020-fixed-60-tps-client.md) | Fixed 60 TPS client with rate-independent movement | Accepted |
+| [0021](0021-game-feel-numbers.md) | Game-feel numbers: speed, jump and air control | Accepted |
+| [0022](0022-placement-inside-player.md) | Refuse placement inside the player | Accepted |
+| [0023](0023-frame-pacing.md) | Decouple presentation with a frame cap | Accepted |
+| [0024](0024-chat.md) | Chat over the existing packet pipeline | Accepted |
+| [0025](0025-transparent-animated-water.md) | Transparent, animated water | Accepted |

@@ -70,8 +70,8 @@ public class Vector
 
 	public boolean isZero()
 	{
-		return this.x <= 0.001
-			&& this.y <= 0.001
-			&& this.z <= 0.001;
+		return Math.abs(this.x) <= 0.001
+			&& Math.abs(this.y) <= 0.001
+			&& Math.abs(this.z) <= 0.001;
 	}
 }

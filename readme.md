@@ -28,7 +28,7 @@ mvn package
 ./run-gpu.sh          # GPU renderer; Maven pulls in LWJGL
 ```
 
-ClassicCraft v1.0 is source-only for now. The last Retro Craft binary (v0.4.5, CPU
+ClassicCraft v1.1 is source-only for now. The last Retro Craft binary (v0.4.5, CPU
 renderer) is still on the
 [Retro Craft releases page](https://github.com/HeathLoganCampbell/Retro-Craft/releases).
 
@@ -60,12 +60,20 @@ an optional backend, not a replacement.
 ./run-gpu.sh --tps 120       # simulation rate (default 60, independent of fps)
 ./run-gpu.sh --speed 1.0     # movement multiplier (default 2.0)
 ./run-gpu.sh --max-fps 500   # uncap vsync and target 500 fps
+./run-gpu.sh --server 127.0.0.1 --name HEATH   # join a server (chat + block sync)
 ./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
 ```
 
 Controls are the same as the CPU client. `Esc` quits, `F2` toggles the debug
 window title, left/right arrows cycle the block type (and turn, matching the
 old key handling).
+
+Chat: `T` (or `/`) opens the input line, `Enter` sends, `Esc` cancels. Run the
+server with `./run-server.sh` first; clients join with `--server`. If no server
+is reachable the game stays single-player and chat lines stay local.
+
+Water is drawn as a tinted, animated surface: rays continue through water and
+blend the bottom, so shallow water shows the floor instead of hiding it.
 
 Requires LWJGL 3 and a GPU with OpenGL 3.3+; on macOS the script passes
 `-XstartOnFirstThread`. Measured on an M1 Pro through Metal-backed OpenGL 4.1:
@@ -77,6 +85,20 @@ movement is compensated for the tick rate so `--tps` changes smoothness, not spe
 
 Known limitations in v1.0: player sprites (the depth attachment is ready), the debug
 overlay and networking are not ported to the GPU client yet.
+
+## Tests
+
+```bash
+mvn test
+```
+
+The suite is JUnit 5 and covers the shared simulation and network layers: world access
+and generation, the block registry and behaviour, raycasting, player physics and
+interaction, packet registry/round-trips/pipeline, and bitmap assets (102 tests).
+
+The GPU renderer is checked separately with `./run-gpu.sh --selftest` (frame time and
+`gpu-frame.png`); `--chat-demo` and `--water-demo` render the overlay and shallow-water
+scenes for inspection.
 
 ## Development
 
@@ -143,3 +165,15 @@ Because it sounded better
 * Simulation runs at a fixed 60 ticks/s, decoupled from the frame rate (`--tps`, `--speed`)
 * Fixed the CPU renderer's per-frame fog/sky leak
 * World tick no longer allocates for all 262,144 blocks every tick
+
+### v1.1 [20/10/2026]
+![ClassicCraft v1.1](./readme-resources/classiccraft-v1.1.png)
+* Internal resolution raised 30%, to 413x260 with the same field of view
+* Transparent, animated water (the floor is visible through shallow water)
+* Chat: `T` to talk, with a server broadcast and a bitmap-font overlay
+* Movement decoupled from the frame rate: fixed 60 ticks/s, `--tps`/`--speed`
+* Air movement reworked: jumps can be steered instead of feeling ballistic
+* Placement is refused inside the player; jump to place underneath yourself
+* Block break/place restored on the GPU path, with the targeted block outlined
+* `--max-fps` for 500+ fps, and a fixed 20 TPS server
+* 102 JUnit 5 tests over the shared simulation and network layers

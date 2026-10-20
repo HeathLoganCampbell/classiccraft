@@ -6,7 +6,9 @@ import com.craftclassic.client.net.NettyClient;
 import com.craftclassic.client.overlay.CrossHair;
 import com.craftclassic.client.overlay.InfoOverlay;
 import com.craftclassic.common.GameSettings;
+import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.entities.Player;
+import com.craftclassic.common.network.ClientBridge;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.packet.packets.EntityPositionPacket;
 import com.craftclassic.common.utils.Location;
@@ -18,7 +20,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Minecraft extends Applet implements Runnable {
+public class Minecraft extends Applet implements Runnable, ClientBridge.View {
 	private static final long serialVersionUID = 1L;
 //    int[] textureData = Textures.textureData;
     public World world;
@@ -80,6 +82,7 @@ public class Minecraft extends Applet implements Runnable {
         this.infoOverlay = new InfoOverlay(this, this.screen);
 
         Player.packetSink = this::sendPacket;
+        ClientBridge.view = this;
 
         INSTANCE = this;
     }
@@ -186,6 +189,24 @@ public class Minecraft extends Applet implements Runnable {
 	public static void setPlaceBlockTypeId(int localPlaceBlockTypeId) {
 		GameSettings.placeBlockTypeId = localPlaceBlockTypeId;
 	}
+
+    @Override
+    public World getWorld()
+    {
+        return this.world;
+    }
+
+    @Override
+    public void addEntity(Entity entity)
+    {
+        this.world.addEntity(entity);
+    }
+
+    @Override
+    public void onChatMessage(String sender, String message)
+    {
+        System.out.println("[" + sender + "] " + message);
+    }
 
     public void sendPacket(Packet packet)
     {

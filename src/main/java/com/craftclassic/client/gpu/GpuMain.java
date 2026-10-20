@@ -2,8 +2,13 @@ package com.craftclassic.client.gpu;
 
 import com.craftclassic.client.Main;
 import com.craftclassic.client.input.Input;
+import com.craftclassic.client.net.NettyClient;
 import com.craftclassic.common.GameSettings;
+import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.entities.Player;
+import com.craftclassic.common.network.ClientBridge;
+import com.craftclassic.common.network.packet.packets.ChatMessagePacket;
+import com.craftclassic.common.network.packet.packets.EntityPositionPacket;
 import com.craftclassic.common.utils.Location;
 import com.craftclassic.common.utils.Vector;
 import com.craftclassic.common.world.Raycast;
@@ -19,6 +24,12 @@ import java.util.concurrent.locks.LockSupport;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.GL_COLOR_ATTACHMENT0;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL30.glDeleteFramebuffers;
+import static org.lwjgl.opengl.GL30.glFramebufferTexture2D;
+import static org.lwjgl.opengl.GL30.glGenFramebuffers;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
@@ -30,7 +41,7 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * <p>The simulation still runs at the ~200 ticks/second the existing constants
  * were tuned for, decoupled from the display refresh rate.</p>
  */
-public final class GpuMain
+public final class GpuMain implements ClientBridge.View
 {
     /**
      * The rate the movement constants in Player.tick were tuned against: the old
@@ -38,6 +49,7 @@ public final class GpuMain
      */
     private static final int REFERENCE_TICKS_PER_SECOND = 60;
     private static final int MAX_CATCH_UP_TICKS = 4;
+    private static final int CHAT_BAND_HEIGHT = 56;
 
     /** 2x MouseGrabberListener's 0.03 factor (Entity.turn adds 0.00015 rad per unit). */
     private static final float MOUSE_SENSITIVITY = 0.06f;
@@ -61,6 +73,16 @@ public final class GpuMain
     private float speedMultiplier = 2.0f;
     private int maxFramesPerSecond = 0;   // 0 = vsync
     private boolean logFps = false;
+
+    private ChatOverlay chat;
+    private NettyClient nettyClient;
+    private String serverHost = null;
+    private int serverPort = NettyClient.DEFAULT_PORT;
+    private String playerName = "Player";
+    private boolean chatDemo = false;
+    private boolean waterDemo = false;
+    private double exitAfterSeconds = -1.0;
+    private boolean skipWindowDestroy = false;
 
     public static void main(String[] args)
     {
@@ -101,6 +123,31 @@ public final class GpuMain
                 case "--log-fps":
                     logFps = true;
                     break;
+                case "--server":
+                    String spec = args[++i];
+                    int colon = spec.indexOf(':');
+                    if (colon > 0)
+                    {
+                        serverHost = spec.substring(0, colon);
+                        serverPort = Integer.parseInt(spec.substring(colon + 1));
+                    }
+                    else
+                    {
+                        serverHost = spec;
+                    }
+                    break;
+                case "--name":
+                    playerName = args[++i];
+                    break;
+                case "--chat-demo":
+                    chatDemo = true;
+                    break;
+                case "--water-demo":
+                    waterDemo = true;
+                    break;
+                case "--exit-after":
+                    exitAfterSeconds = Double.parseDouble(args[++i]);
+                    break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
                     break;
@@ -122,6 +169,26 @@ public final class GpuMain
             initInput();
 
             renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT, Main.FOCAL);
+            chat = new ChatOverlay(Main.WIDTH, CHAT_BAND_HEIGHT);
+            ClientBridge.view = this;
+
+            if (serverHost != null)
+            {
+                nettyClient = new NettyClient(serverHost, serverPort, playerName);
+
+                if (nettyClient.connect())
+                {
+                    Player.packetSink = nettyClient::sendPacket;
+                    System.out.println("Server:   connected to " + serverHost + ":" + serverPort
+                            + " as " + playerName);
+                }
+                else
+                {
+                    System.out.println("Server:   no server at " + serverHost + ":" + serverPort
+                            + " (single-player)");
+                    nettyClient = null;
+                }
+            }
 
             System.out.println("Renderer: " + glGetString(GL_RENDERER));
             System.out.println("OpenGL:   " + glGetString(GL_VERSION));
@@ -139,15 +206,21 @@ public final class GpuMain
         }
         finally
         {
+            if (chat != null)
+                chat.close();
+
             if (renderer != null)
                 renderer.close();
 
-            if (window != NULL)
+            if (window != NULL && !skipWindowDestroy)
             {
                 glfwDestroyWindow(window);
                 glfwTerminate();
             }
         }
+
+        if (skipWindowDestroy)
+            System.exit(0);
     }
 
     private void initWindow(boolean hidden)
@@ -195,12 +268,40 @@ public final class GpuMain
     {
         glfwSetKeyCallback(window, (handle, key, scancode, action, mods) ->
         {
+            if (chat != null && chat.isOpen())
+            {
+                if (action == GLFW_PRESS || action == GLFW_REPEAT)
+                {
+                    if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER)
+                    {
+                        sendChat();
+                        chat.setOpen(false);
+                    }
+                    else if (key == GLFW_KEY_ESCAPE)
+                    {
+                        chat.setOpen(false);
+                    }
+                    else if (key == GLFW_KEY_BACKSPACE)
+                    {
+                        chat.backspace();
+                    }
+                }
+                return;
+            }
+
             int awtKey = toAwtKey(key);
             if (awtKey > 0)
                 Input.setKey(awtKey, action != GLFW_RELEASE);
 
             if (action != GLFW_PRESS)
                 return;
+
+            if (key == GLFW_KEY_T || key == GLFW_KEY_SLASH)
+            {
+                chat.setOpen(true);
+                releaseMovementKeys();
+                return;
+            }
 
             switch (key)
             {
@@ -229,8 +330,17 @@ public final class GpuMain
             }
         });
 
+        glfwSetCharCallback(window, (handle, codepoint) ->
+        {
+            if (chat != null && chat.isOpen() && codepoint >= 32 && codepoint < 127)
+                chat.append((char) codepoint);
+        });
+
         glfwSetMouseButtonCallback(window, (handle, button, action, mods) ->
         {
+            if (chat != null && chat.isOpen())
+                return;
+
             boolean pressed = action == GLFW_PRESS;
 
             if (button == GLFW_MOUSE_BUTTON_LEFT)
@@ -272,10 +382,15 @@ public final class GpuMain
 
         long frameNanos = maxFramesPerSecond > 0 ? 1_000_000_000L / maxFramesPerSecond : 0L;
         long nextFrame = System.nanoTime();
+        long startedAt = System.nanoTime();
 
         while (!glfwWindowShouldClose(window))
         {
             glfwPollEvents();
+
+            if (exitAfterSeconds > 0.0
+                    && (System.nanoTime() - startedAt) / 1_000_000_000.0 > exitAfterSeconds)
+                glfwSetWindowShouldClose(window, true);
 
             long now = System.nanoTime();
             accumulator += (now - last) / 1_000_000_000.0;
@@ -292,12 +407,24 @@ public final class GpuMain
                 steps++;
             }
 
+            if (steps > 0 && nettyClient != null && nettyClient.isConnected())
+            {
+                Location location = player.getLocation();
+                nettyClient.sendPacket(new EntityPositionPacket(0,
+                        location.getX(), location.getY(), location.getZ()));
+            }
+
             // A long stall (window drag, breakpoint) must not replay seconds of
             // simulation in one frame.
             if (accumulator >= tickSeconds)
                 accumulator = 0.0;
 
-            if (mouseDeltaX != 0.0 || mouseDeltaY != 0.0)
+            if (chat.isOpen())
+            {
+                mouseDeltaX = 0.0;
+                mouseDeltaY = 0.0;
+            }
+            else if (mouseDeltaX != 0.0 || mouseDeltaY != 0.0)
             {
                 player.turn((float) (mouseDeltaX * MOUSE_SENSITIVITY),
                         (float) (-mouseDeltaY * MOUSE_SENSITIVITY));
@@ -308,10 +435,16 @@ public final class GpuMain
 
             updateTargetBlock();
             renderFrame();
+            chat.update();
 
             glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
             if (framebufferWidth[0] > 0 && framebufferHeight[0] > 0)
-                renderer.blit(framebufferWidth[0], framebufferHeight[0]);
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                renderer.blit(framebufferWidth[0], framebufferHeight[0],
+                        chat.getTexture(), chat.isVisible(),
+                        (float) chat.getHeight() / Main.HEIGHT);
+            }
 
             glfwSwapBuffers(window);
 
@@ -376,6 +509,49 @@ public final class GpuMain
         renderer.setTarget(hit.getX(), hit.getY(), hit.getZ());
     }
 
+    @Override
+    public World getWorld()
+    {
+        return world;
+    }
+
+    @Override
+    public void addEntity(Entity entity)
+    {
+        world.addEntity(entity);
+    }
+
+    @Override
+    public void onChatMessage(String sender, String message)
+    {
+        if (chat != null)
+            chat.addMessage(sender, message);
+    }
+
+    private void sendChat()
+    {
+        String text = chat.getInput().trim();
+        chat.clearInput();
+
+        if (text.isEmpty())
+            return;
+
+        if (nettyClient != null && nettyClient.isConnected())
+            nettyClient.sendPacket(new ChatMessagePacket(text));
+        else
+            chat.addMessage("", text);
+    }
+
+    private static void releaseMovementKeys()
+    {
+        Input.setKey(KeyEvent.VK_W, false);
+        Input.setKey(KeyEvent.VK_A, false);
+        Input.setKey(KeyEvent.VK_S, false);
+        Input.setKey(KeyEvent.VK_D, false);
+        Input.setKey(KeyEvent.VK_SPACE, false);
+        Input.setKey(KeyEvent.VK_CONTROL, false);
+    }
+
     private void renderFrame()
     {
         Location location = player.getLocation();
@@ -401,9 +577,40 @@ public final class GpuMain
         double simMilliseconds = (System.nanoTime() - simStart) / 1_000_000.0 / warmupTicks;
 
         Location location = player.getLocation();
-        location.setYaw(0.7f);
-        location.setPitch(-0.0012f);
+
+        if (waterDemo)
+        {
+            // One-block-deep pool over a brick floor, straight ahead.
+            for (int x = 20; x < 46; x++)
+            {
+                for (int z = 34; z < 48; z++)
+                {
+                    world.setBlock(x, 63, z, com.craftclassic.common.blocks.Block.BRICK);
+                    world.setBlock(x, 62, z, com.craftclassic.common.blocks.Block.WATER);
+                }
+            }
+            world.setBlock(30, 61, 38, com.craftclassic.common.blocks.Block.STONE);
+            world.setBlock(34, 61, 40, com.craftclassic.common.blocks.Block.STONE);
+
+            location.setYaw(0.0f);
+            location.setPitch(-0.004f);
+        }
+        else
+        {
+            location.setYaw(0.7f);
+            location.setPitch(-0.0012f);
+        }
+
         updateTargetBlock();
+
+        if (chatDemo)
+        {
+            chat.addMessage("STEVE", "HELLO FROM THE SERVER");
+            chat.addMessage("ALEX", "THE NEW CHAT WORKS");
+            chat.setOpen(true);
+            chat.append("TYPING A MESSAGE");
+            chat.update();
+        }
 
         renderFrame();
         glFinish();
@@ -440,6 +647,53 @@ public final class GpuMain
                 Main.WIDTH * Main.HEIGHT,
                 (Main.WIDTH * Main.HEIGHT) / (milliseconds / 1000.0) / 1_000_000.0);
         System.out.println("Wrote       gpu-frame.png");
+
+        if (chatDemo)
+        {
+            // Compose through the blit shader into an offscreen target, so the
+            // test never touches the (hidden) window's back buffer.
+            int target = glGenFramebuffers();
+            int colour = glGenTextures();
+
+            glBindTexture(GL_TEXTURE_2D, colour);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Main.WIDTH, Main.HEIGHT, 0,
+                    GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, target);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colour, 0);
+
+            renderer.blit(Main.WIDTH, Main.HEIGHT, chat.getTexture(), chat.isVisible(),
+                    (float) chat.getHeight() / Main.HEIGHT);
+
+            ByteBuffer composed = MemoryUtil.memAlloc(Main.WIDTH * Main.HEIGHT * 4);
+            try
+            {
+                glReadBuffer(GL_COLOR_ATTACHMENT0);
+                glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                glReadPixels(0, 0, Main.WIDTH, Main.HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, composed);
+                GlUtil.writePng(Main.WIDTH, Main.HEIGHT, composed, "gpu-chat.png");
+                System.out.println("Wrote       gpu-chat.png");
+            }
+            catch (Exception e)
+            {
+                System.err.println("Could not write gpu-chat.png: " + e.getMessage());
+            }
+            finally
+            {
+                MemoryUtil.memFree(composed);
+            }
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glReadBuffer(GL_BACK);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDeleteFramebuffers(target);
+            glDeleteTextures(colour);
+
+            // The hidden window's Metal context blocks in glfwDestroyWindow
+            // after this offscreen composite; the process is a test run, so
+            // skip the destroy and exit after GL cleanup instead.
+            skipWindowDestroy = true;
+        }
 
         // Touch the world and render again: this must trigger exactly one
         // re-upload. Guards the blockVersion contract between World and GPU.

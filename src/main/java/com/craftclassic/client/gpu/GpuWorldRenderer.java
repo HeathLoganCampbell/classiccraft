@@ -52,12 +52,16 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int uFov;
     private final int uFocal;
     private final int uFogDist;
+    private final int uTime;
     private final int uSky;
     private final int uTarget;
 
     private final int uFrame;
     private final int uLowRes;
     private final int uCrosshair;
+    private final int uChat;
+    private final int uChatVisible;
+    private final int uChatFraction;
 
     private final ByteBuffer worldUpload = MemoryUtil.memAlloc(WORLD_SIZE * WORLD_SIZE * WORLD_SIZE);
     private long uploadedVersion = Long.MIN_VALUE;
@@ -84,12 +88,16 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uFov = uniform(raycastProgram, "uFov");
         this.uFocal = uniform(raycastProgram, "uFocal");
         this.uFogDist = uniform(raycastProgram, "uFogDist");
+        this.uTime = uniform(raycastProgram, "uTime");
         this.uSky = uniform(raycastProgram, "uSky");
         this.uTarget = uniform(raycastProgram, "uTarget");
 
         this.uFrame = uniform(blitProgram, "uFrame");
         this.uLowRes = uniform(blitProgram, "uLowRes");
         this.uCrosshair = uniform(blitProgram, "uCrosshair");
+        this.uChat = uniform(blitProgram, "uChat");
+        this.uChatVisible = uniform(blitProgram, "uChatVisible");
+        this.uChatFraction = uniform(blitProgram, "uChatFraction");
 
         // --- world: one byte per block -------------------------------------
         this.worldTexture = glGenTextures();
@@ -175,6 +183,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         glUniform1f(uFov, fov);
         glUniform1f(uFocal, focal);
         glUniform1f(uFogDist, 50.0f);
+        glUniform1f(uTime, (System.nanoTime() / 1_000_000_000L) % 1000L);
         glUniform3f(uSky, 0xA7 / 255.0f, 0xC9 / 255.0f, 0xEB / 255.0f);
         glUniform3i(uTarget, targetX, targetY, targetZ);
 
@@ -191,7 +200,18 @@ public final class GpuWorldRenderer implements AutoCloseable
     /** Nearest-neighbour upscale from the low-res target to the window. */
     public void blit(int windowWidth, int windowHeight)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        blit(windowWidth, windowHeight, 0, false, 0.0f);
+    }
+
+    /**
+     * @param chatTexture  RGBA chat band, or 0 when there is no chat
+     * @param chatFraction chat band height as a fraction of the low-res height
+     */
+    public void blit(int windowWidth, int windowHeight, int chatTexture,
+                     boolean chatVisible, float chatFraction)
+    {
+        // Framebuffer is chosen by the caller: the window in the game loop,
+        // an offscreen target in the self-test.
         glViewport(0, 0, windowWidth, windowHeight);
 
         glUseProgram(blitProgram);
@@ -200,6 +220,16 @@ public final class GpuWorldRenderer implements AutoCloseable
         glUniform1i(uFrame, 0);
         glUniform2f(uLowRes, width, height);
         glUniform2i(uCrosshair, width / 2, height / 2);
+
+        boolean showChat = chatVisible && chatTexture != 0;
+        glUniform1i(uChatVisible, showChat ? 1 : 0);
+        glUniform1f(uChatFraction, chatFraction);
+
+        if (showChat)
+        {
+            GlUtil.bindTexture(1, chatTexture, GL_TEXTURE_2D);
+            glUniform1i(uChat, 1);
+        }
 
         glBindVertexArray(emptyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);

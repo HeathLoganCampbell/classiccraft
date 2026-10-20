@@ -22,12 +22,14 @@ uniform vec2  uResolution;
 uniform float uFov;
 uniform float uFocal;
 uniform float uFogDist;
+uniform float uTime;
 uniform vec3  uSky;
 uniform ivec3 uTarget;          // targeted block; x < 0 means none
 
 const ivec3 kWorldSize = ivec3(64, 64, 64);
 const ivec3 kOrigin    = ivec3(64, 64, 64);
 const int   kAtlasRows = 48;    // 768 / 16: one block owns 48 atlas rows
+const int   kWaterSlot = 13;    // WaterBlock's texture id
 
 void main()
 {
@@ -57,9 +59,13 @@ void main()
         (dir.y > 0.0 ? float(cell.y + 1) - cam.y : cam.y - float(cell.y)) * inv.y,
         (dir.z > 0.0 ? float(cell.z + 1) - cam.z : cam.z - float(cell.z)) * inv.z);
 
-    float t    = 0.0;
-    int   axis = 0;
-    uint  id   = 0u;
+    float t        = 0.0;
+    int   axis     = 0;
+    uint  id       = 0u;
+
+    vec3  color    = vec3(0.0);
+    float coverage = 0.0;
+    float depth    = 1e9;
 
     for (int i = 0; i < 512; ++i)
     {
@@ -68,8 +74,84 @@ void main()
             break;                      // left the world, same as isInWorld()
 
         id = texelFetch(uWorld, b, 0).r;
+
         if (id != 0u)
-            break;
+        {
+            vec3 hit = cam + dir * t;
+
+            int texX;
+            int texY;
+
+            if (axis == 1)
+            {
+                // Top/bottom face.
+                texX = int(hit.x * 16.0) & 15;
+                texY = int(hit.z * 16.0) & 15;
+                if (dir.y < 0.0)
+                    texY += 32;
+            }
+            else
+            {
+                // Side faces, projected on the (x + z) diagonal like the CPU path.
+                texX = int((hit.x + hit.z) * 16.0) & 15;
+                texY = (int(hit.y * 16.0) & 15) + 16;
+            }
+
+            // Stored value is (textureId + 1) with bit 7 set when the block is
+            // selectable, so 0 can keep meaning "air".
+            int  textureSlot = int(id & 127u) - 1;
+            bool selectable  = (id & 128u) != 0u;
+            bool isWater     = textureSlot == kWaterSlot;
+
+            if (depth > 1e8)
+                depth = t;
+
+            if (isWater)
+            {
+                // Animate the tile and add a moving brightness wave so the
+                // surface reads as moving even though the texture is a single
+                // tile.
+                texX = (texX + int(uTime * 6.0)) & 15;
+                texY = (texY + int(uTime * 4.0)) & 15;
+            }
+
+            vec3 texel = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
+
+            if (isWater)
+            {
+                float wave = sin(hit.x * 2.2 + uTime * 2.0) * 0.5
+                           + sin(hit.z * 1.7 - uTime * 1.3) * 0.5;
+                texel *= 0.85 + 0.22 * wave;
+            }
+            else
+            {
+                bool onEdge = texX == 0 || texX == 15 || (texY & 15) == 0 || (texY & 15) == 15;
+                if (selectable && uTarget.x >= 0 && all(equal(b, uTarget)) && onEdge)
+                    texel = vec3(1.0, 1.0, 0.0);
+            }
+
+            float shade = (255.0 - float((axis + 2) % 3) * 50.0) / 255.0;
+            float fog   = clamp(1.0 - t / uFogDist, 0.0, 1.0);
+            vec3  lit   = texel * shade * fog;
+
+            if (isWater)
+            {
+                // Front-to-back blend; each water cell adds tint and keeps the
+                // ray going so the bottom stays visible.
+                float alpha = 0.55;
+                color    += (1.0 - coverage) * alpha * lit;
+                coverage += (1.0 - coverage) * alpha;
+
+                if (coverage > 0.95)
+                    break;
+            }
+            else
+            {
+                color += (1.0 - coverage) * lit;
+                coverage = 1.0;
+                break;
+            }
+        }
 
         if (tMax.x < tMax.y)
         {
@@ -86,52 +168,7 @@ void main()
             break;
     }
 
-    vec3 color = uSky;
-    float depth = 1e9;
-
-    if (id != 0u)
-    {
-        vec3 hit = cam + dir * t;
-
-        int texX;
-        int texY;
-
-        if (axis == 1)
-        {
-            // Top/bottom face.
-            texX = int(hit.x * 16.0) & 15;
-            texY = int(hit.z * 16.0) & 15;
-            if (dir.y < 0.0)
-                texY += 32;
-        }
-        else
-        {
-            // Side faces, projected on the (x + z) diagonal like the CPU path.
-            texX = int((hit.x + hit.z) * 16.0) & 15;
-            texY = (int(hit.y * 16.0) & 15) + 16;
-        }
-
-        // Stored value is (textureId + 1) with bit 7 set when the block is
-        // selectable, so 0 can keep meaning "air".
-        int  textureSlot = int(id & 127u) - 1;
-        bool selectable  = (id & 128u) != 0u;
-
-        vec3 texel = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
-
-        // Same highlight rule as CrossHair/World.render: the edge texels of the
-        // targeted block's face, for selectable blocks only.
-        bool onEdge = texX == 0 || texX == 15 || (texY & 15) == 0 || (texY & 15) == 15;
-        if (selectable && uTarget.x >= 0 && all(equal(cell - kOrigin, uTarget)) && onEdge)
-            texel = vec3(1.0, 1.0, 0.0);
-
-        color = texel;
-
-        float shade = (255.0 - float((axis + 2) % 3) * 50.0) / 255.0;   // fake face lighting
-        float fog   = clamp(1.0 - t / uFogDist, 0.0, 1.0);
-
-        color *= shade * fog;
-        depth  = t;
-    }
+    color += (1.0 - coverage) * uSky;
 
     oColor = vec4(color, 1.0);
     oDepth = depth;
