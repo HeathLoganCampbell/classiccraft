@@ -30,8 +30,15 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  */
 public final class GpuMain
 {
-    private static final double TICK_SECONDS = 1.0 / 200.0;
-    private static final float MOUSE_SENSITIVITY = 0.12f;
+    /**
+     * The rate the movement constants in Player.tick were tuned against: the old
+     * client ticked once per frame, at roughly 60 fps.
+     */
+    private static final int REFERENCE_TICKS_PER_SECOND = 60;
+    private static final int MAX_CATCH_UP_TICKS = 4;
+
+    /** Matches MouseGrabberListener: 0.03 * Entity.turn's 0.00015 rad per pixel. */
+    private static final float MOUSE_SENSITIVITY = 0.03f;
 
     private long window;
     private GpuWorldRenderer renderer;
@@ -46,6 +53,10 @@ public final class GpuMain
     private double lastMouseY;
 
     private boolean debug = true;
+
+    private int ticksPerSecond = REFERENCE_TICKS_PER_SECOND;
+    private double tickSeconds = 1.0 / REFERENCE_TICKS_PER_SECOND;
+    private float speedMultiplier = 1.0f;
 
     public static void main(String[] args)
     {
@@ -74,11 +85,25 @@ public final class GpuMain
                 case "--seed":
                     seed = Long.parseLong(args[++i]);
                     break;
+                case "--tps":
+                    ticksPerSecond = Integer.parseInt(args[++i]);
+                    break;
+                case "--speed":
+                    speedMultiplier = Float.parseFloat(args[++i]);
+                    break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
                     break;
             }
         }
+
+        ticksPerSecond = Math.max(10, Math.min(1000, ticksPerSecond));
+        speedMultiplier = Math.max(0.1f, Math.min(10.0f, speedMultiplier));
+        tickSeconds = 1.0 / ticksPerSecond;
+
+        // Keep motion in blocks per second constant as the tick rate changes.
+        GameSettings.tickScale = REFERENCE_TICKS_PER_SECOND / (float) ticksPerSecond;
+        GameSettings.speedMultiplier = speedMultiplier;
 
         try
         {
@@ -93,6 +118,7 @@ public final class GpuMain
             System.out.println("Target:   " + Main.WIDTH + "x" + Main.HEIGHT
                     + " -> " + (Main.WIDTH * Main.SCALE) + "x" + (Main.HEIGHT * Main.SCALE));
             System.out.println("World:    " + (naturalTerrain ? "natural" : "flat") + ", seed " + seed);
+            System.out.println("Sim:      " + ticksPerSecond + " ticks/s, speed x" + speedMultiplier);
 
             if (selfTest)
                 runSelfTest(selfTestFrames);
@@ -243,11 +269,18 @@ public final class GpuMain
             if (accumulator > 0.25)
                 accumulator = 0.25;
 
-            while (accumulator >= TICK_SECONDS)
+            int steps = 0;
+            while (accumulator >= tickSeconds && steps < MAX_CATCH_UP_TICKS)
             {
                 world.tick();
-                accumulator -= TICK_SECONDS;
+                accumulator -= tickSeconds;
+                steps++;
             }
+
+            // A long stall (window drag, breakpoint) must not replay seconds of
+            // simulation in one frame.
+            if (accumulator >= tickSeconds)
+                accumulator = 0.0;
 
             if (mouseDeltaX != 0.0 || mouseDeltaY != 0.0)
             {
@@ -273,10 +306,10 @@ public final class GpuMain
                 {
                     Location location = player.getLocation();
                     glfwSetWindowTitle(window, String.format(
-                            "ClassicCraft (GPU) - %dx%d -> %dx%d - %d fps - %.1f %.1f %.1f - %s",
+                            "ClassicCraft (GPU) - %dx%d -> %dx%d - %d fps - %d tps - %.1f %.1f %.1f - %s",
                             Main.WIDTH, Main.HEIGHT,
                             Main.WIDTH * Main.SCALE, Main.HEIGHT * Main.SCALE,
-                            fpsFrames,
+                            fpsFrames, ticksPerSecond,
                             location.getX(), location.getY(), location.getZ(),
                             com.craftclassic.common.blocks.Block
                                     .getBlockById(GameSettings.placeBlockTypeId).getName()));
@@ -305,11 +338,12 @@ public final class GpuMain
      */
     private void runSelfTest(int frames)
     {
-        // Let gravity drop the player onto the terrain first.
+        // Let gravity drop the player onto the terrain first (10 simulated seconds).
+        int warmupTicks = (int) Math.ceil(10.0 / tickSeconds);
         long simStart = System.nanoTime();
-        for (int i = 0; i < 600; i++)
+        for (int i = 0; i < warmupTicks; i++)
             world.tick();
-        double simMilliseconds = (System.nanoTime() - simStart) / 1_000_000.0 / 600.0;
+        double simMilliseconds = (System.nanoTime() - simStart) / 1_000_000.0 / warmupTicks;
 
         Location location = player.getLocation();
         location.setYaw(0.7f);
@@ -345,7 +379,7 @@ public final class GpuMain
 
         System.out.printf("Self-test:  %d frames, %.3f ms/frame, %.0f fps (CPU-serialised)%n",
                 frames, milliseconds, 1000.0 / milliseconds);
-        System.out.printf("Tick:       %.3f ms/tick at 200 ticks/s%n", simMilliseconds);
+        System.out.printf("Tick:       %.3f ms/tick at %d ticks/s%n", simMilliseconds, ticksPerSecond);
         System.out.printf("Pixels:     %d  (%.1f M rays/s)%n",
                 Main.WIDTH * Main.HEIGHT,
                 (Main.WIDTH * Main.HEIGHT) / (milliseconds / 1000.0) / 1_000_000.0);

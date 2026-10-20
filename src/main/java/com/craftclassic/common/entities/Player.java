@@ -89,11 +89,11 @@ public class Player extends LivingEntity
 		float sinYaw = (float)Math.sin(playerLoc.getYaw() * 100f);
 		float cosYaw = (float)Math.cos(playerLoc.getYaw() * 100f);
 
-		float speed = 0.02f;
+		float speed = 0.02f * GameSettings.tickScale * GameSettings.speedMultiplier;
 
 		if(sprinting)
 		{
-			speed = 0.03f;
+			speed = 0.03f * GameSettings.tickScale * GameSettings.speedMultiplier;
 		}
 
 		float accX = (float)((Input.getKey(KeyEvent.VK_D) ? 1 : 0) - (Input.getKey(KeyEvent.VK_A) ? 1 : 0)) * speed;
@@ -103,7 +103,7 @@ public class Player extends LivingEntity
 
 		float xVel = sinYaw * accZ + cosYaw * accX;
 		float zVel = cosYaw * accZ - sinYaw * accX;
-		float yVel = 0.004f;
+		float yVel = 0.004f * GameSettings.tickScale;
 
 		this.getVelocity().add(new Vector(xVel, yVel, zVel));
 
@@ -168,7 +168,7 @@ public class Player extends LivingEntity
 						if (Input.getKey(KeyEvent.VK_SPACE))
 						{
 							Input.setKey(KeyEvent.VK_SPACE, false);
-							this.getVelocity().setY(-0.13f);
+							this.getVelocity().setY(-0.13f * GameSettings.tickScale);
 							this.setOnJump(true);
 							this.setJumpingTicks(0);
 							this.setOnGround(false);
