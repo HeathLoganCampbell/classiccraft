@@ -123,15 +123,18 @@ class RaycastTest
     }
 
     @Test
-    void nonAirBlocksAreTargetableEvenWhenNotSelectable()
+    void waterIsSkippedLikeAirWhenTargeting()
     {
         World world = flatWorld();
         world.setBlock(32, 31, 33, Block.WATER);
+        world.setBlock(32, 31, 34, Block.STONE);
 
         Raycast.Hit hit = Raycast.cast(world, CAMERA_X, CAMERA_Y, CAMERA_Z, 0, 0, 5);
 
         assertNotNull(hit);
-        assertEquals(33, hit.getZ());
+        assertEquals(34, hit.getZ(), "the ray looks through water");
+        assertEquals(33, hit.getPlaceZ(), "and places into the water cell");
+        assertEquals(2, hit.getAxis());
     }
 
     @Test

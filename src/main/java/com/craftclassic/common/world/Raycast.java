@@ -95,7 +95,11 @@ public final class Raycast
                     || cellX >= WORLD_SIZE || cellY >= WORLD_SIZE || cellZ >= WORLD_SIZE)
                 return null;
 
-            if (world.getBlock(cellX, cellY, cellZ) != Block.AIR)
+            Block block = world.getBlock(cellX, cellY, cellZ);
+
+            // Water behaves like air for targeting: the ray looks through it
+            // so placement goes into the water cell, not above the surface.
+            if (block != Block.AIR && !block.isLiquid())
             {
                 int placeX = cellX;
                 int placeY = cellY;

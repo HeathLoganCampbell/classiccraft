@@ -73,10 +73,8 @@ public class Player extends LivingEntity
 		if (Input.getMouse(MouseEvent.BUTTON3) && this.getTargetBlock() != null)
 		{
 			Block block = getWorld().getBlock(this.getTargetBlockPlace());
-			Block target = getWorld().getBlock(this.getTargetBlock());
 
-			if(!target.isLiquid()
-					&& !blockIntersectsPlayer(this.getTargetBlockPlace())
+			if(!blockIntersectsPlayer(this.getTargetBlockPlace())
 					&& block.onPlace(new PlaceEvent(this.getTargetBlockPlace()))) {
 				BlockPlacePacket blockPlacePacket = new BlockPlacePacket((int) this.getTargetBlockPlace().getX(),
 																		 (int) this.getTargetBlockPlace().getY(),

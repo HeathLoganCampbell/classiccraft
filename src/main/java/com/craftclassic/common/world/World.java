@@ -374,7 +374,7 @@ public class World implements IWorld
 
 							boolean crosshairOnBlock = screenX == this.minecraft.screen.halfWidth
 													&& screenY == this.minecraft.screen.halfHeight;
-							if (currentPosition < readDistance  && crosshairOnBlock)
+							if (currentPosition < readDistance  && crosshairOnBlock  && !block.isLiquid())
 							{
 								tempTargetBlock = new Location(this, blockX, blockY, blockZ);
 
