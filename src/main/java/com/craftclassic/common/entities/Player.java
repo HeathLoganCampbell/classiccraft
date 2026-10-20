@@ -98,18 +98,19 @@ public class Player extends LivingEntity
 			speed = 0.03f * GameSettings.tickScale * GameSettings.speedMultiplier;
 		}
 
-		// Air control is deliberately weak: you keep most of your takeoff
-		// momentum and can nudge a landing, but you cannot turn or accelerate
-		// like you can on the ground (5% of ground acceleration).
+		// Air movement is a damped version of ground movement: the higher drag
+		// lets you cancel and redirect momentum in ~0.25s instead of being
+		// carried in a straight line, but the lower acceleration still caps you
+		// at walking speed.
 		if(!onGround)
 		{
-			speed *= 0.06f;
+			speed *= 0.12f;
 		}
 
 		float accX = (float)((Input.getKey(KeyEvent.VK_D) ? 1 : 0) - (Input.getKey(KeyEvent.VK_A) ? 1 : 0)) * speed;
 		float accZ = (float)((Input.getKey(KeyEvent.VK_W) ? 1 : 0) - (Input.getKey(KeyEvent.VK_S) ? 1 : 0)) * speed;
 
-		float horizontalDrag = onGround ? 0.5f : 0.98f;
+		float horizontalDrag = onGround ? 0.5f : 0.94f;
 		this.getVelocity().scalar(horizontalDrag, 0.99f, horizontalDrag);
 
 		float xVel = sinYaw * accZ + cosYaw * accX;
