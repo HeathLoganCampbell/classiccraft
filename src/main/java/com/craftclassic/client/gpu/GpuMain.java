@@ -56,7 +56,7 @@ public final class GpuMain
 
     private int ticksPerSecond = REFERENCE_TICKS_PER_SECOND;
     private double tickSeconds = 1.0 / REFERENCE_TICKS_PER_SECOND;
-    private float speedMultiplier = 1.0f;
+    private float speedMultiplier = 2.0f;
 
     public static void main(String[] args)
     {

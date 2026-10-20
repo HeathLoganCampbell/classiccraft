@@ -57,7 +57,7 @@ an optional backend, not a replacement.
 ./run-gpu.sh                 # play, natural terrain
 ./run-gpu.sh --flat          # the old flat world
 ./run-gpu.sh --tps 120       # simulation rate (default 60, independent of fps)
-./run-gpu.sh --speed 1.5     # movement multiplier
+./run-gpu.sh --speed 1.0     # movement multiplier (default 2.0)
 ./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
 ```
 
@@ -71,7 +71,7 @@ Requires LWJGL 3 and a GPU with OpenGL 3.3+; on macOS the script passes
 
 The simulation runs at a fixed **60 ticks/second**, decoupled from the display, and
 movement is compensated for the tick rate so `--tps` changes smoothness, not speed.
-`--speed` changes speed. See [ADR 0016](docs/adr/0016-gpu-raycast-backend.md).
+`--speed` changes speed (default 2.0). See [ADR 0016](docs/adr/0016-gpu-raycast-backend.md).
 
 Known limitations in v1.0: player sprites (the depth attachment is ready), the debug
 overlay and networking are not ported to the GPU client yet.
