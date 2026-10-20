@@ -1,9 +1,10 @@
 package com.craftclassic.client.gpu;
 
-import com.craftclassic.client.assets.Bitmap;
-import com.craftclassic.client.assets.Textures;
 import org.lwjgl.system.MemoryUtil;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +40,9 @@ public final class ChatOverlay implements AutoCloseable
 
     private final int width;
     private final int height;
+    private final int fontWidth;
+    private final int fontHeight;
+    private final int[] fontPixels;
     private final int[] pixels;
     private final ByteBuffer upload;
     private final int texture;
@@ -57,6 +61,10 @@ public final class ChatOverlay implements AutoCloseable
         this.height = bandHeight;
         this.pixels = new int[width * bandHeight];
         this.upload = MemoryUtil.memAlloc(width * bandHeight * 4);
+        FontAtlas font = loadFont();
+        this.fontWidth = font.width;
+        this.fontHeight = font.height;
+        this.fontPixels = font.pixels;
 
         this.texture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -68,7 +76,7 @@ public final class ChatOverlay implements AutoCloseable
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
-    public void addMessage(String sender, String message)
+    public synchronized void addMessage(String sender, String message)
     {
         String line = (sender == null || sender.isEmpty()) ? message : sender + ": " + message;
 
@@ -80,19 +88,19 @@ public final class ChatOverlay implements AutoCloseable
         dirty = true;
     }
 
-    public boolean isOpen()
+    public synchronized boolean isOpen()
     {
         return open;
     }
 
-    public void setOpen(boolean open)
+    public synchronized void setOpen(boolean open)
     {
         this.open = open;
         this.showUntil = open ? Long.MAX_VALUE : System.currentTimeMillis() + VISIBLE_MILLIS;
         this.dirty = true;
     }
 
-    public void append(char character)
+    public synchronized void append(char character)
     {
         if (input.length() >= MAX_INPUT)
             return;
@@ -101,13 +109,13 @@ public final class ChatOverlay implements AutoCloseable
         dirty = true;
     }
 
-    public void append(String text)
+    public synchronized void append(String text)
     {
         for (int i = 0; i < text.length(); i++)
             append(text.charAt(i));
     }
 
-    public void backspace()
+    public synchronized void backspace()
     {
         if (input.length() == 0)
             return;
@@ -116,18 +124,18 @@ public final class ChatOverlay implements AutoCloseable
         dirty = true;
     }
 
-    public void clearInput()
+    public synchronized void clearInput()
     {
         input.setLength(0);
         dirty = true;
     }
 
-    public String getInput()
+    public synchronized String getInput()
     {
         return input.toString();
     }
 
-    public boolean isVisible()
+    public synchronized boolean isVisible()
     {
         return open || System.currentTimeMillis() < showUntil;
     }
@@ -136,7 +144,7 @@ public final class ChatOverlay implements AutoCloseable
      * Rasterises and uploads if the text or visibility changed. Call once per
      * frame before blitting.
      */
-    public void update()
+    public synchronized void update()
     {
         if (!isVisible())
         {
@@ -176,7 +184,6 @@ public final class ChatOverlay implements AutoCloseable
 
     private void drawText(int startX, int startY, String text, int colour)
     {
-        Bitmap font = Textures.fontTilesheet;
         String upper = text.toUpperCase();
 
         int x = startX;
@@ -203,7 +210,8 @@ public final class ChatOverlay implements AutoCloseable
             {
                 for (int px = 0; px < GLYPH_WIDTH; px++)
                 {
-                    if (font.getPixel(glyphX + px, glyphY + py) > 0)
+                    int source = fontPixels[(glyphX + px) + (glyphY + py) * fontWidth];
+                    if ((source & 0xFFFFFF) != 0)
                         putPixel(x + px, startY + py, colour);
                 }
             }
@@ -256,4 +264,45 @@ public final class ChatOverlay implements AutoCloseable
         glDeleteTextures(texture);
         MemoryUtil.memFree(upload);
     }
+
+    private static final class FontAtlas
+    {
+        final int width;
+        final int height;
+        final int[] pixels;
+
+        FontAtlas(int width, int height, int[] pixels)
+        {
+            this.width = width;
+            this.height = height;
+            this.pixels = pixels;
+        }
+    }
+
+    /**
+     * Plain ImageIO + getRGB: the legacy Bitmap loader creates a Graphics2D,
+     * and initialising AWT inside the GLFW run loop deadlocks glfwPollEvents on
+     * macOS.
+     */
+    private static FontAtlas loadFont()
+    {
+        try (InputStream in = ChatOverlay.class.getClassLoader().getResourceAsStream("font.png"))
+        {
+            if (in == null)
+                throw new IllegalStateException("Missing font.png");
+
+            BufferedImage image = ImageIO.read(in);
+            int width = image.getWidth();
+            int height = image.getHeight();
+            int[] pixels = new int[width * height];
+            image.getRGB(0, 0, width, height, pixels, 0, width);
+
+            return new FontAtlas(width, height, pixels);
+        }
+        catch (Exception e)
+        {
+            throw new IllegalStateException("Could not load font.png", e);
+        }
+    }
+
 }

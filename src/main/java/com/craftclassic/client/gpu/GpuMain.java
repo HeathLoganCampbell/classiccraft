@@ -13,6 +13,7 @@ import com.craftclassic.common.utils.Location;
 import com.craftclassic.common.utils.Vector;
 import com.craftclassic.common.world.Raycast;
 import com.craftclassic.common.world.World;
+import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryUtil;
@@ -82,6 +83,7 @@ public final class GpuMain implements ClientBridge.View
     private boolean chatDemo = false;
     private boolean waterDemo = false;
     private double exitAfterSeconds = -1.0;
+    private double openChatAfterSeconds = -1.0;
     private boolean skipWindowDestroy = false;
 
     public static void main(String[] args)
@@ -148,6 +150,9 @@ public final class GpuMain implements ClientBridge.View
                 case "--exit-after":
                     exitAfterSeconds = Double.parseDouble(args[++i]);
                     break;
+                case "--open-chat-after":
+                    openChatAfterSeconds = Double.parseDouble(args[++i]);
+                    break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
                     break;
@@ -169,7 +174,7 @@ public final class GpuMain implements ClientBridge.View
             initInput();
 
             renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT, Main.FOCAL);
-            chat = new ChatOverlay(Main.WIDTH, CHAT_BAND_HEIGHT);
+            chat = new ChatOverlay(Main.WIDTH * 2, CHAT_BAND_HEIGHT);
             ClientBridge.view = this;
 
             if (serverHost != null)
@@ -248,7 +253,19 @@ public final class GpuMain implements ClientBridge.View
         glfwSwapInterval(hidden || maxFramesPerSecond > 0 ? 0 : 1);
 
         if (!hidden)
+        {
+            GLFWVidMode mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            if (mode != null)
+            {
+                glfwSetWindowPos(window,
+                        (mode.width() - Main.WIDTH * Main.SCALE) / 2,
+                        (mode.height() - Main.HEIGHT * Main.SCALE) / 2);
+            }
+
+            glfwShowWindow(window);
             glfwFocusWindow(window);
+            glfwRequestWindowAttention(window);
+        }
 
         GL.createCapabilities();
     }
@@ -388,8 +405,16 @@ public final class GpuMain implements ClientBridge.View
         {
             glfwPollEvents();
 
-            if (exitAfterSeconds > 0.0
-                    && (System.nanoTime() - startedAt) / 1_000_000_000.0 > exitAfterSeconds)
+            double elapsedSeconds = (System.nanoTime() - startedAt) / 1_000_000_000.0;
+
+            if (openChatAfterSeconds > 0.0 && !chat.isOpen() && elapsedSeconds > openChatAfterSeconds)
+            {
+                chat.setOpen(true);
+                releaseMovementKeys();
+                System.out.println("debug: opened chat");
+            }
+
+            if (exitAfterSeconds > 0.0 && elapsedSeconds > exitAfterSeconds)
                 glfwSetWindowShouldClose(window, true);
 
             long now = System.nanoTime();
@@ -443,7 +468,7 @@ public final class GpuMain implements ClientBridge.View
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 renderer.blit(framebufferWidth[0], framebufferHeight[0],
                         chat.getTexture(), chat.isVisible(),
-                        (float) chat.getHeight() / Main.HEIGHT);
+                        (float) chat.getHeight() / 2.0f / Main.HEIGHT);
             }
 
             glfwSwapBuffers(window);
