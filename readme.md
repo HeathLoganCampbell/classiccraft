@@ -208,7 +208,7 @@ Because it sounded better
 * 102 JUnit 5 tests over the shared simulation and network layers
 
 ### v1.2 [21/10/2026]
-![ClassicCraft v1.2](./readme-resources/classiccraft-v1.2.png)
+![ClassicCraft v1.2](https://raw.githubusercontent.com/HeathLoganCampbell/classiccraft/master/readme-resources/classicraft-v1.2.png)
 * Remote players are visible as camera-facing bunny billboards, lit and depth-tested
 * Chat commands: `/ping` (real round-trip ms), `/msg`/`/tell`/`/w`, `/list`, `/help`
 * Chat box is 40% of the screen, 30% larger text, fades out when idle, blinking cursor
