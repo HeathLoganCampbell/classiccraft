@@ -1,19 +1,15 @@
 package com.craftclassic.client.gpu;
 
-import com.craftclassic.client.Main;
 import com.craftclassic.common.blocks.Block;
-import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.world.World;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
-import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 
@@ -41,21 +37,7 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int depthTexture;
     private final int depthRenderbuffer;
 
-    private final int spriteProgram;
-    private final int spriteVao;
-    private final int spriteVbo;
-    private final int spriteTexture;
-    private final int uSpriteCenter;
-    private final int uSpriteSize;
-    private final int uSpriteResolution;
-    private final int uSpriteTexture;
-    private final int uSpriteFog;
-    private final int uSpriteFocal;
-    private final int uSpriteCam;
-    private final int uSpriteYaw;
-    private final int uSpritePitch;
-    private final int uSpriteRight;
-    private final int uSpriteUp;
+    private final SpriteRenderer sprites;
 
     private final int worldTexture;
     private final int atlasTexture;
@@ -175,38 +157,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         if (status != GL_FRAMEBUFFER_COMPLETE)
             throw new IllegalStateException("Framebuffer incomplete: 0x" + Integer.toHexString(status));
 
-        // --- sprite pass ---------------------------------------------------
-        this.spriteProgram = GlUtil.program("shaders/sprite.vert", "shaders/sprite.frag");
-        this.uSpriteCenter = uniform(spriteProgram, "uCenter");
-        this.uSpriteSize = uniform(spriteProgram, "uSize");
-        this.uSpriteResolution = uniform(spriteProgram, "uResolution");
-        this.uSpriteTexture = uniform(spriteProgram, "uSprite");
-        this.uSpriteFog = uniform(spriteProgram, "uFogDist");
-        this.uSpriteFocal = uniform(spriteProgram, "uFocal");
-        this.uSpriteCam = uniform(spriteProgram, "uCamPos");
-        this.uSpriteYaw = uniform(spriteProgram, "uYaw");
-        this.uSpritePitch = uniform(spriteProgram, "uPitch");
-        this.uSpriteRight = uniform(spriteProgram, "uRight");
-        this.uSpriteUp = uniform(spriteProgram, "uUp");
-        this.spriteTexture = GlUtil.playerSpriteTexture("player.png");
-
-        float[] quad =
-        {
-                -0.5f, -0.5f,
-                 0.5f, -0.5f,
-                 0.5f,  0.5f,
-                -0.5f,  0.5f
-        };
-
-        this.spriteVao = glGenVertexArrays();
-        this.spriteVbo = glGenBuffers();
-        glBindVertexArray(spriteVao);
-        glBindBuffer(GL_ARRAY_BUFFER, spriteVbo);
-        glBufferData(GL_ARRAY_BUFFER, quad, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, 0L);
-        glBindVertexArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        this.sprites = new SpriteRenderer();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -264,7 +215,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
-        drawSprites(world, camX, camY, camZ, yaw, pitch);
+        sprites.render(world, camX, camY, camZ, yaw, pitch, focal, width, height);
 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
@@ -274,65 +225,6 @@ public final class GpuWorldRenderer implements AutoCloseable
      * Billboard sprites for remote players, using the same projection as the
      * CPU renderer's renderSprite(). The raycast's gl_FragDepth occludes them.
      */
-    private void drawSprites(World world, float camX, float camY, float camZ, float yaw, float pitch)
-    {
-        List<Entity> entities = world.getEntities();
-        if (entities.isEmpty())
-            return;
-
-        float scaledYaw = yaw * 100.0f;
-        float scaledPitch = -pitch * 100.0f;
-
-        double cosYaw = Math.cos(scaledYaw);
-        double sinYaw = Math.sin(scaledYaw);
-        double cosPitch = Math.cos(scaledPitch);
-        double sinPitch = Math.sin(scaledPitch);
-
-        // World size, chosen so the projected size matches the old sprite
-        // (baseWidth pixels at the focal distance).
-        float worldWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
-        float worldHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
-
-        glUseProgram(spriteProgram);
-        glUniform2f(uSpriteResolution, width, height);
-        glUniform1f(uSpriteFog, 50.0f);
-        glUniform1f(uSpriteFocal, focal);
-        glUniform3f(uSpriteCam, camX, camY, camZ);
-        glUniform1f(uSpriteYaw, scaledYaw);
-        glUniform1f(uSpritePitch, scaledPitch);
-        glUniform3f(uSpriteRight, (float) cosYaw, 0.0f, (float) -sinYaw);
-        glUniform3f(uSpriteUp,
-                (float) (-sinYaw * sinPitch),
-                (float) -cosPitch,
-                (float) (-cosYaw * sinPitch));
-
-        GlUtil.bindTexture(0, spriteTexture, GL_TEXTURE_2D);
-        glUniform1i(uSpriteTexture, 0);
-
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        glBindVertexArray(spriteVao);
-
-        for (Entity entity : entities)
-        {
-            if (entity.getEntityId() == 0 || entity.getLocation() == null)
-                continue;
-
-            glUniform3f(uSpriteCenter,
-                    entity.getLocation().getX(),
-                    entity.getLocation().getY(),
-                    entity.getLocation().getZ());
-            glUniform2f(uSpriteSize, worldWidth, worldHeight);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        }
-
-        glBindVertexArray(0);
-        glDisable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
-    }
 
     /** Nearest-neighbour upscale from the low-res target to the window. */
     public void blit(int windowWidth, int windowHeight)
@@ -448,13 +340,11 @@ public final class GpuWorldRenderer implements AutoCloseable
     {
         glDeleteProgram(raycastProgram);
         glDeleteProgram(blitProgram);
-        glDeleteProgram(spriteProgram);
-        glDeleteTextures(new int[] { colorTexture, depthTexture, worldTexture, atlasTexture, spriteTexture });
+        glDeleteTextures(new int[] { colorTexture, depthTexture, worldTexture, atlasTexture });
         glDeleteFramebuffers(framebuffer);
         glDeleteRenderbuffers(depthRenderbuffer);
         glDeleteVertexArrays(emptyVao);
-        glDeleteVertexArrays(spriteVao);
-        glDeleteBuffers(spriteVbo);
+        sprites.close();
         MemoryUtil.memFree(worldUpload);
     }
 }
