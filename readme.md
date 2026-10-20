@@ -61,12 +61,16 @@ an optional backend, not a replacement.
 ./run-gpu.sh --speed 1.0     # movement multiplier (default 2.0)
 ./run-gpu.sh --max-fps 500   # uncap vsync and target 500 fps
 ./run-gpu.sh --server 127.0.0.1 --name HEATH   # join a server (chat + block sync)
+CLASSICCRAFT_USERNAME=HEATH ./run-gpu.sh --server 127.0.0.1   # name from the environment
 ./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
 ```
 
 Controls are the same as the CPU client. `Esc` quits, `F2` toggles the debug
 window title, left/right arrows cycle the block type (and turn, matching the
 old key handling).
+
+The player name comes from `--name`, otherwise `CLASSICCRAFT_USERNAME`, otherwise
+`Player`.
 
 Chat: `T` (or `/`) opens the input line, `Enter` sends, `Esc` cancels. Messages
 support Minecraft-style codes: `&0`-`&f` colours, `&l` bold, `&r` reset

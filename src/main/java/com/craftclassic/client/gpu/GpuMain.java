@@ -84,7 +84,7 @@ public final class GpuMain implements ClientBridge.View
     private NettyClient nettyClient;
     private String serverHost = null;
     private int serverPort = NettyClient.DEFAULT_PORT;
-    private String playerName = "Player";
+    private String playerName = null;
     private boolean chatDemo = false;
     private boolean waterDemo = false;
     private double exitAfterSeconds = -1.0;
@@ -165,6 +165,8 @@ public final class GpuMain implements ClientBridge.View
             }
         }
 
+        playerName = resolveName(playerName, System.getenv("CLASSICCRAFT_USERNAME"));
+
         ticksPerSecond = Math.max(10, Math.min(1000, ticksPerSecond));
         speedMultiplier = Math.max(0.1f, Math.min(10.0f, speedMultiplier));
         tickSeconds = 1.0 / ticksPerSecond;
@@ -206,6 +208,7 @@ public final class GpuMain implements ClientBridge.View
             System.out.println("OpenGL:   " + glGetString(GL_VERSION));
             System.out.println("Target:   " + Main.WIDTH + "x" + Main.HEIGHT
                     + " -> " + (Main.WIDTH * Main.SCALE) + "x" + (Main.HEIGHT * Main.SCALE));
+            System.out.println("Name:     " + playerName);
             System.out.println("World:    " + (naturalTerrain ? "natural" : "flat") + ", seed " + seed);
             System.out.println("Sim:      " + ticksPerSecond + " ticks/s, speed x" + speedMultiplier);
             System.out.println("Frames:   " + (maxFramesPerSecond > 0
@@ -770,6 +773,20 @@ public final class GpuMain implements ClientBridge.View
             yaw += twoPi;
 
         location.setYaw(yaw);
+    }
+
+    /**
+     * Name precedence: --name, then CLASSICCRAFT_USERNAME, then "Player".
+     */
+    static String resolveName(String cliName, String environmentName)
+    {
+        if (cliName != null && !cliName.isBlank())
+            return cliName.trim();
+
+        if (environmentName != null && !environmentName.isBlank())
+            return environmentName.trim();
+
+        return "Player";
     }
 
     private static int toAwtKey(int glfwKey)
