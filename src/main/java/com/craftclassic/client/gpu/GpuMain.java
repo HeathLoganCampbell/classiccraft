@@ -50,7 +50,12 @@ public final class GpuMain implements ClientBridge.View
      */
     private static final int REFERENCE_TICKS_PER_SECOND = 60;
     private static final int MAX_CATCH_UP_TICKS = 4;
-    private static final int CHAT_BAND_HEIGHT = 56;
+    private static final float CHAT_WIDTH_FRACTION = 0.4f;
+    // Texture size / on-screen band. 254x52 mapped to 40% width and 34 low-res
+    // rows gives 1.95x scaling: 30% larger glyphs than the previous 1.5x.
+    private static final int CHAT_TEXTURE_WIDTH = 254;
+    private static final int CHAT_TEXTURE_HEIGHT = 52;
+    private static final int CHAT_BAND_LOW_RES = 34;
 
     /** 2x MouseGrabberListener's 0.03 factor (Entity.turn adds 0.00015 rad per unit). */
     private static final float MOUSE_SENSITIVITY = 0.06f;
@@ -175,7 +180,7 @@ public final class GpuMain implements ClientBridge.View
             initInput();
 
             renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT, Main.FOCAL);
-            chat = new ChatOverlay(Main.WIDTH * 2, CHAT_BAND_HEIGHT);
+            chat = new ChatOverlay(CHAT_TEXTURE_WIDTH, CHAT_TEXTURE_HEIGHT);
             chat.setUsername(playerName);
             ClientBridge.view = this;
 
@@ -480,7 +485,8 @@ public final class GpuMain implements ClientBridge.View
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 renderer.blit(framebufferWidth[0], framebufferHeight[0],
                         chat.getTexture(), chat.isVisible(),
-                        (float) chat.getHeight() / 2.0f / Main.HEIGHT);
+                        (float) CHAT_BAND_LOW_RES / Main.HEIGHT,
+                        CHAT_WIDTH_FRACTION);
             }
 
             glfwSwapBuffers(window);
@@ -604,7 +610,7 @@ public final class GpuMain implements ClientBridge.View
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colour, 0);
 
         renderer.blit(width, height, chat.getTexture(), chat.isVisible(),
-                (float) chat.getHeight() / 2.0f / Main.HEIGHT);
+                (float) CHAT_BAND_LOW_RES / Main.HEIGHT, CHAT_WIDTH_FRACTION);
 
         ByteBuffer composed = MemoryUtil.memAlloc(width * height * 4);
         try
@@ -734,7 +740,11 @@ public final class GpuMain implements ClientBridge.View
             // Closing the input should keep the recent messages but drop the
             // input line and cursor.
             chat.setOpen(false);
+
+            // Let the background finish fading before capturing the state.
+            try { Thread.sleep(1_200L); } catch (InterruptedException ignored) { }
             chat.update();
+
             writeChatComposite("gpu-chat-closed.png");
 
             skipWindowDestroy = true;

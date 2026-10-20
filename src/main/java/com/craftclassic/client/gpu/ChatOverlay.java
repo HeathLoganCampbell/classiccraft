@@ -30,8 +30,9 @@ public final class ChatOverlay implements AutoCloseable
     private static final int GLYPH_HEIGHT = 6;
     private static final int ADVANCE = 6;
     private static final int LINE_HEIGHT = 7;
-    private static final int MAX_MESSAGES = 6;
+    private static final int MAX_MESSAGES = 5;
     private static final long VISIBLE_MILLIS = 10_000L;
+    private static final long FADE_MILLIS = 1_000L;
     private static final int MAX_INPUT = 100;
 
     private static final int BACKGROUND = 0x66000000;
@@ -64,6 +65,9 @@ public final class ChatOverlay implements AutoCloseable
     private boolean dirty = true;
     private boolean wasVisible;
     private String username = "";
+    private long closedAt = 0L;
+    private float backgroundFade = 1.0f;
+    private float textFade = 1.0f;
     private long cursorEpoch = System.currentTimeMillis();
     private boolean cursorVisible = true;
 
@@ -115,6 +119,8 @@ public final class ChatOverlay implements AutoCloseable
     {
         this.open = open;
         this.showUntil = open ? Long.MAX_VALUE : System.currentTimeMillis() + VISIBLE_MILLIS;
+        if (!open)
+            this.closedAt = System.currentTimeMillis();
         resetCursorBlink();
         this.dirty = true;
     }
@@ -180,14 +186,27 @@ public final class ChatOverlay implements AutoCloseable
             return;
         }
 
+        long now = System.currentTimeMillis();
+
         if (open)
         {
-            boolean visible = (System.currentTimeMillis() - cursorEpoch) % 1000L < 500L;
+            this.backgroundFade = 1.0f;
+            this.textFade = 1.0f;
+
+            boolean visible = (now - cursorEpoch) % 1000L < 500L;
             if (visible != cursorVisible)
             {
                 cursorVisible = visible;
                 dirty = true;
             }
+        }
+        else
+        {
+            // The box is only needed while typing. After closing it fades over
+            // a second; the messages stay readable, then fade at the end.
+            this.backgroundFade = clamp01(1.0f - (now - this.closedAt) / (float) FADE_MILLIS);
+            this.textFade = clamp01((this.showUntil - now) / (float) FADE_MILLIS);
+            this.dirty = true;
         }
 
         if (dirty || !wasVisible)
@@ -201,7 +220,7 @@ public final class ChatOverlay implements AutoCloseable
 
     private void rasterise()
     {
-        Arrays.fill(pixels, BACKGROUND);
+        Arrays.fill(pixels, withAlpha(BACKGROUND, this.backgroundFade));
 
         int lineY;
 
@@ -216,7 +235,7 @@ public final class ChatOverlay implements AutoCloseable
             {
                 int cursorX = 4 + visualLength(prompt) * ADVANCE;
                 for (int y = inputY; y < inputY + GLYPH_HEIGHT; y++)
-                    putPixel(cursorX, y, INPUT_TEXT);
+                    putPixel(cursorX, y, withAlpha(INPUT_TEXT, this.textFade));
             }
 
             lineY = inputY - LINE_HEIGHT;
@@ -345,6 +364,17 @@ public final class ChatOverlay implements AutoCloseable
         }
 
         return length;
+    }
+
+    private static float clamp01(float value)
+    {
+        return Math.max(0.0f, Math.min(1.0f, value));
+    }
+
+    private static int withAlpha(int argb, float factor)
+    {
+        int alpha = (int) (((argb >>> 24) & 0xFF) * clamp01(factor));
+        return (alpha << 24) | (argb & 0xFFFFFF);
     }
 
     private static boolean isCode(char character)
