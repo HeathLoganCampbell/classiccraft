@@ -271,12 +271,9 @@ public final class GpuWorldRenderer implements AutoCloseable
             return;
 
         float scaledYaw = yaw * 100.0f;
-        float scaledPitch = -pitch * 100.0f;
 
         double cosYaw = Math.cos(scaledYaw);
         double sinYaw = Math.sin(scaledYaw);
-        double cosPitch = Math.cos(scaledPitch);
-        double sinPitch = Math.sin(scaledPitch);
 
         float baseWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE;
         float baseHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE;
@@ -315,16 +312,12 @@ public final class GpuWorldRenderer implements AutoCloseable
             if (zz <= 0.0)
                 continue;
 
-            double depth = sinPitch * diffY + cosPitch * zz;
-            if (depth < 0.0)
-                continue;
-
             float screenX = (float) (xx * focal / zz) + width * 0.5f;
             float screenY = (float) (diffY * focal / zz) + height * 0.5f;
 
             glUniform2f(uSpriteCenter, screenX, screenY);
             glUniform2f(uSpriteSize, baseWidth / (float) zz, baseHeight / (float) zz);
-            glUniform1f(uSpriteZ, (float) depth);
+            glUniform1f(uSpriteZ, (float) zz);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 
