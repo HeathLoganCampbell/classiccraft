@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
@@ -148,6 +149,153 @@ final class GlUtil
         }
 
         ImageIO.write(image, "png", new File(path));
+    }
+
+
+    public static final class SpriteTexture
+    {
+        public final int id;
+        public final int width;
+        public final int height;
+
+        SpriteTexture(int id, int width, int height)
+        {
+            this.id = id;
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    /**
+     * player.png with its black background made transparent and cropped to the
+     * opaque bounds. A border flood fill keeps interior black pixels (eyes).
+     */
+    static SpriteTexture playerSpriteTexture(String resourcePath)
+    {
+        try (InputStream in = GlUtil.class.getClassLoader().getResourceAsStream(resourcePath))
+        {
+            if (in == null)
+                throw new IllegalStateException("Missing classpath resource: " + resourcePath);
+
+            BufferedImage image = ImageIO.read(in);
+            int width = image.getWidth();
+            int height = image.getHeight();
+            int[] argb = new int[width * height];
+            image.getRGB(0, 0, width, height, argb, 0, width);
+
+            boolean[] background = new boolean[width * height];
+            ArrayDeque<Integer> queue = new ArrayDeque<>();
+
+            for (int x = 0; x < width; x++)
+            {
+                seed(argb, background, queue, width, x, 0);
+                seed(argb, background, queue, width, x, height - 1);
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                seed(argb, background, queue, width, 0, y);
+                seed(argb, background, queue, width, width - 1, y);
+            }
+
+            while (!queue.isEmpty())
+            {
+                int index = queue.poll();
+                if (background[index])
+                    continue;
+
+                background[index] = true;
+
+                int x = index % width;
+                int y = index / width;
+
+                if (x > 0) seed(argb, background, queue, width, x - 1, y);
+                if (x + 1 < width) seed(argb, background, queue, width, x + 1, y);
+                if (y > 0) seed(argb, background, queue, width, x, y - 1);
+                if (y + 1 < height) seed(argb, background, queue, width, x, y + 1);
+            }
+
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (background[x + y * width])
+                        continue;
+
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                minX = 0;
+                minY = 0;
+                maxX = width - 1;
+                maxY = height - 1;
+            }
+
+            int croppedWidth = maxX - minX + 1;
+            int croppedHeight = maxY - minY + 1;
+
+            ByteBuffer pixels = MemoryUtil.memAlloc(croppedWidth * croppedHeight * 4);
+            try
+            {
+                for (int y = minY; y <= maxY; y++)
+                {
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        int i = x + y * width;
+                        int colour = argb[i];
+
+                        pixels.put((byte) ((colour >> 16) & 0xFF));
+                        pixels.put((byte) ((colour >> 8) & 0xFF));
+                        pixels.put((byte) (colour & 0xFF));
+                        pixels.put((byte) (background[i] ? 0 : 0xFF));
+                    }
+                }
+                pixels.flip();
+
+                int texture = glGenTextures();
+                glBindTexture(GL_TEXTURE_2D, texture);
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, croppedWidth, croppedHeight, 0,
+                        GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+                return new SpriteTexture(texture, croppedWidth, croppedHeight);
+            }
+            finally
+            {
+                MemoryUtil.memFree(pixels);
+            }
+        }
+        catch (IOException e)
+        {
+            throw new IllegalStateException("Could not load " + resourcePath, e);
+        }
+    }
+
+    private static void seed(int[] argb, boolean[] background, ArrayDeque<Integer> queue,
+                             int width, int x, int y)
+    {
+        int index = x + y * width;
+        if (background[index])
+            return;
+
+        int colour = argb[index];
+        if (((colour >> 16) & 0xFF) < 8 && ((colour >> 8) & 0xFF) < 8 && (colour & 0xFF) < 8)
+            queue.add(index);
     }
 
     static void bindTexture(int unit, int texture, int target)

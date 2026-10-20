@@ -29,7 +29,13 @@ public final class SpriteRenderer implements AutoCloseable
     private final int vao;
     private final int vbo;
 
+    private final int texture;
+    private final int textureWidth;
+    private final int textureHeight;
+
     private final int uColor;
+    private final int uSprite;
+    private final int uTextured;
     private final int uCenter;
     private final int uSize;
     private final int uRight;
@@ -56,6 +62,13 @@ public final class SpriteRenderer implements AutoCloseable
         this.uResolution = uniform("uResolution");
         this.uFogDist = uniform("uFogDist");
         this.uColor = uniform("uColor");
+        this.uSprite = uniform("uSprite");
+        this.uTextured = uniform("uTextured");
+
+        GlUtil.SpriteTexture sprite = GlUtil.playerSpriteTexture("player.png");
+        this.texture = sprite.id;
+        this.textureWidth = sprite.width;
+        this.textureHeight = sprite.height;
 
         // aPos: x = left..right, y = top..bottom
         float[] quad =
@@ -101,8 +114,8 @@ public final class SpriteRenderer implements AutoCloseable
 
         double cy = Math.cos(scaledYaw);
         double sy = Math.sin(scaledYaw);
-        // Player-sized rectangle: 0.6 wide, 1.8 tall, in world units.
-        float worldWidth = 0.6f;
+        // Player rectangle: 1.2 wide, 1.8 tall, in world units.
+        float worldWidth = 1.2f;
         float worldHeight = 1.8f;
 
         glUseProgram(program);
@@ -120,7 +133,8 @@ public final class SpriteRenderer implements AutoCloseable
         glUniform3f(uRight, (float) cy, 0.0f, (float) -sy);
         glUniform3f(uUp, 0.0f, -1.0f, 0.0f);
 
-        glUniform4f(uColor, 0.86f, 0.86f, 0.86f, 1.0f);
+        glUniform1i(uSprite, 0);
+        GlUtil.bindTexture(0, texture, GL_TEXTURE_2D);
 
         // Players are drawn over the world: a billboard clipped by a block
         // corner reads as a triangular chunk taken out of the model.
@@ -142,7 +156,24 @@ public final class SpriteRenderer implements AutoCloseable
                     entity.getLocation().getX(),
                     entity.getLocation().getY() + FEET_OFFSET - worldHeight * 0.5f,
                     entity.getLocation().getZ());
+
+            // Wide panel behind the model.
             glUniform2f(uSize, worldWidth, worldHeight);
+            glUniform1i(uTextured, 0);
+            glUniform4f(uColor, 0.20f, 0.22f, 0.30f, 1.0f);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+            // Bunny texture centred on the panel, preserving its aspect.
+            float modelHeight = worldHeight;
+            float modelWidth = modelHeight * this.textureWidth / (float) this.textureHeight;
+            if (modelWidth > worldWidth)
+            {
+                modelWidth = worldWidth;
+                modelHeight = modelWidth * this.textureHeight / (float) this.textureWidth;
+            }
+
+            glUniform2f(uSize, modelWidth, modelHeight);
+            glUniform1i(uTextured, 1);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         }
 
@@ -155,6 +186,7 @@ public final class SpriteRenderer implements AutoCloseable
     public void close()
     {
         glDeleteProgram(program);
+        glDeleteTextures(texture);
         glDeleteBuffers(vbo);
         glDeleteVertexArrays(vao);
     }
