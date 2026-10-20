@@ -73,6 +73,7 @@ public final class GpuMain implements ClientBridge.View
     private double lastMouseY;
 
     private boolean debug = true;
+    private boolean cursorGrabbed = true;
 
     private int ticksPerSecond = REFERENCE_TICKS_PER_SECOND;
     private double tickSeconds = 1.0 / REFERENCE_TICKS_PER_SECOND;
@@ -91,6 +92,7 @@ public final class GpuMain implements ClientBridge.View
     private int windowX = Integer.MIN_VALUE;
     private int windowY = 0;
     private boolean waterDemo = false;
+    private boolean spriteDemo = false;
     private double exitAfterSeconds = -1.0;
     private double openChatAfterSeconds = -1.0;
     private boolean skipWindowDestroy = false;
@@ -168,6 +170,9 @@ public final class GpuMain implements ClientBridge.View
                     break;
                 case "--water-demo":
                     waterDemo = true;
+                    break;
+                case "--sprite-demo":
+                    spriteDemo = true;
                     break;
                 case "--exit-after":
                     exitAfterSeconds = Double.parseDouble(args[++i]);
@@ -326,10 +331,12 @@ public final class GpuMain implements ClientBridge.View
                     {
                         sendChat();
                         chat.setOpen(false);
+                        setCursorGrabbed(true);
                     }
                     else if (key == GLFW_KEY_ESCAPE)
                     {
                         chat.setOpen(false);
+                        setCursorGrabbed(true);
                     }
                     else if (key == GLFW_KEY_BACKSPACE)
                     {
@@ -350,6 +357,7 @@ public final class GpuMain implements ClientBridge.View
             {
                 chat.setOpen(true);
                 releaseMovementKeys();
+                setCursorGrabbed(false);
 
                 // GLFW sends the character for this key after the key callback.
                 // Without this the 'T' that opened the chat is typed into it.
@@ -361,6 +369,11 @@ public final class GpuMain implements ClientBridge.View
             {
                 case GLFW_KEY_ESCAPE:
                     glfwSetWindowShouldClose(handle, true);
+                    break;
+                case GLFW_KEY_F1:
+                    // Release the captured cursor so another client window can
+                    // be clicked (multi-client testing on one machine).
+                    setCursorGrabbed(!cursorGrabbed);
                     break;
                 case GLFW_KEY_F2:
                     debug = !debug;
@@ -487,7 +500,7 @@ public final class GpuMain implements ClientBridge.View
             if (accumulator >= tickSeconds)
                 accumulator = 0.0;
 
-            if (chat.isOpen())
+            if (chat.isOpen() || !cursorGrabbed)
             {
                 mouseDeltaX = 0.0;
                 mouseDeltaY = 0.0;
@@ -611,6 +624,13 @@ public final class GpuMain implements ClientBridge.View
             chat.addMessage(playerName, text);
     }
 
+    private void setCursorGrabbed(boolean grabbed)
+    {
+        this.cursorGrabbed = grabbed;
+        glfwSetInputMode(window, GLFW_CURSOR,
+                grabbed ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    }
+
     private static void releaseMovementKeys()
     {
         Input.setKey(KeyEvent.VK_W, false);
@@ -710,6 +730,17 @@ public final class GpuMain implements ClientBridge.View
         {
             location.setYaw(0.7f);
             location.setPitch(-0.0012f);
+        }
+
+        if (spriteDemo)
+        {
+            location.setYaw(0.0f);
+            location.setPitch(0.0f);
+
+            Entity remote = new Entity("Remote", 1);
+            remote.setLocation(new Location(world, location.getX(), location.getY(),
+                    location.getZ() + 4.0f));
+            world.addEntity(remote);
         }
 
         updateTargetBlock();

@@ -189,4 +189,5 @@ void main()
 
     oColor = vec4(color, 1.0);
     oDepth = depth;
+    gl_FragDepth = (coverage > 0.0) ? clamp(t / uFogDist, 0.0, 1.0) : 1.0;
 }

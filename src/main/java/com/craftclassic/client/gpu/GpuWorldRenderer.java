@@ -1,15 +1,19 @@
 package com.craftclassic.client.gpu;
 
+import com.craftclassic.client.Main;
 import com.craftclassic.common.blocks.Block;
+import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.world.World;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
+import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 
@@ -35,6 +39,18 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int framebuffer;
     private final int colorTexture;
     private final int depthTexture;
+    private final int depthRenderbuffer;
+
+    private final int spriteProgram;
+    private final int spriteVao;
+    private final int spriteVbo;
+    private final int spriteTexture;
+    private final int uSpriteCenter;
+    private final int uSpriteSize;
+    private final int uSpriteResolution;
+    private final int uSpriteTexture;
+    private final int uSpriteZ;
+    private final int uSpriteFog;
 
     private final int worldTexture;
     private final int atlasTexture;
@@ -62,6 +78,7 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int uChat;
     private final int uChatVisible;
     private final int uChatFraction;
+    private final int uChatWidth;
 
     private final ByteBuffer worldUpload = MemoryUtil.memAlloc(WORLD_SIZE * WORLD_SIZE * WORLD_SIZE);
     private long uploadedVersion = Long.MIN_VALUE;
@@ -98,6 +115,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uChat = uniform(blitProgram, "uChat");
         this.uChatVisible = uniform(blitProgram, "uChatVisible");
         this.uChatFraction = uniform(blitProgram, "uChatFraction");
+        this.uChatWidth = uniform(blitProgram, "uChatWidth");
 
         // --- world: one byte per block -------------------------------------
         this.worldTexture = glGenTextures();
@@ -140,9 +158,45 @@ public final class GpuWorldRenderer implements AutoCloseable
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, depthTexture, 0);
         glDrawBuffers(new int[] { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 });
 
+        // Real depth buffer for the sprite pass. The raycast writes gl_FragDepth
+        // from its hit distance, so sprites are occluded without sampling the
+        // depth attachment (which would be a feedback loop).
+        this.depthRenderbuffer = glGenRenderbuffers();
+        glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
+
         int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         if (status != GL_FRAMEBUFFER_COMPLETE)
             throw new IllegalStateException("Framebuffer incomplete: 0x" + Integer.toHexString(status));
+
+        // --- sprite pass ---------------------------------------------------
+        this.spriteProgram = GlUtil.program("shaders/sprite.vert", "shaders/sprite.frag");
+        this.uSpriteCenter = uniform(spriteProgram, "uCenter");
+        this.uSpriteSize = uniform(spriteProgram, "uSize");
+        this.uSpriteResolution = uniform(spriteProgram, "uResolution");
+        this.uSpriteTexture = uniform(spriteProgram, "uSprite");
+        this.uSpriteZ = uniform(spriteProgram, "uZ");
+        this.uSpriteFog = uniform(spriteProgram, "uFogDist");
+        this.spriteTexture = GlUtil.texture2D("player.png", false);
+
+        float[] quad =
+        {
+                -0.5f, -0.5f,
+                 0.5f, -0.5f,
+                 0.5f,  0.5f,
+                -0.5f,  0.5f
+        };
+
+        this.spriteVao = glGenVertexArrays();
+        this.spriteVbo = glGenBuffers();
+        glBindVertexArray(spriteVao);
+        glBindBuffer(GL_ARRAY_BUFFER, spriteVbo);
+        glBufferData(GL_ARRAY_BUFFER, quad, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, 0L);
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -171,8 +225,12 @@ public final class GpuWorldRenderer implements AutoCloseable
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glViewport(0, 0, width, height);
-        glDisable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_ALWAYS);
+        glDepthMask(true);
+        glClearDepth(1.0);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(raycastProgram);
 
@@ -195,12 +253,85 @@ public final class GpuWorldRenderer implements AutoCloseable
         glBindVertexArray(emptyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
+
+        drawSprites(world, camX, camY, camZ, yaw, pitch);
+
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
+    }
+
+    /**
+     * Billboard sprites for remote players, using the same projection as the
+     * CPU renderer's renderSprite(). The raycast's gl_FragDepth occludes them.
+     */
+    private void drawSprites(World world, float camX, float camY, float camZ, float yaw, float pitch)
+    {
+        List<Entity> entities = world.getEntities();
+        if (entities.isEmpty())
+            return;
+
+        float scaledYaw = yaw * 100.0f;
+        float scaledPitch = -pitch * 100.0f;
+
+        double cosYaw = Math.cos(scaledYaw);
+        double sinYaw = Math.sin(scaledYaw);
+        double cosPitch = Math.cos(scaledPitch);
+        double sinPitch = Math.sin(scaledPitch);
+
+        float baseWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE;
+        float baseHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE;
+
+        glUseProgram(spriteProgram);
+        glUniform2f(uSpriteResolution, width, height);
+        glUniform1f(uSpriteFog, 50.0f);
+        GlUtil.bindTexture(0, spriteTexture, GL_TEXTURE_2D);
+        glUniform1i(uSpriteTexture, 0);
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glBindVertexArray(spriteVao);
+
+        for (Entity entity : entities)
+        {
+            if (entity.getEntityId() == 0 || entity.getLocation() == null)
+                continue;
+
+            double diffX = entity.getLocation().getX() - camX;
+            double diffY = entity.getLocation().getY() - camY;
+            double diffZ = entity.getLocation().getZ() - camZ;
+
+            if (diffY == 0.0)
+                diffY = 0.005;
+
+            double xx = cosYaw * diffX - sinYaw * diffZ;
+            double zz = sinYaw * diffX + cosYaw * diffZ;
+            double yy = cosPitch * diffY - sinPitch * zz;
+            zz = sinPitch * diffY + cosPitch * zz;
+
+            if (zz < 0.0)
+                continue;
+
+            float screenX = (float) (xx * focal / zz) + width * 0.5f;
+            float screenY = (float) (yy * focal / zz) + height * 0.5f;
+
+            glUniform2f(uSpriteCenter, screenX, screenY);
+            glUniform2f(uSpriteSize, baseWidth / (float) zz, baseHeight / (float) zz);
+            glUniform1f(uSpriteZ, (float) zz);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        }
+
+        glBindVertexArray(0);
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
     }
 
     /** Nearest-neighbour upscale from the low-res target to the window. */
     public void blit(int windowWidth, int windowHeight)
     {
-        blit(windowWidth, windowHeight, 0, false, 0.0f);
+        blit(windowWidth, windowHeight, 0, false, 0.0f, 1.0f);
     }
 
     /**
@@ -208,7 +339,7 @@ public final class GpuWorldRenderer implements AutoCloseable
      * @param chatFraction chat band height as a fraction of the low-res height
      */
     public void blit(int windowWidth, int windowHeight, int chatTexture,
-                     boolean chatVisible, float chatFraction)
+                     boolean chatVisible, float chatFraction, float chatWidthFraction)
     {
         // Framebuffer is chosen by the caller: the window in the game loop,
         // an offscreen target in the self-test.
@@ -224,6 +355,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         boolean showChat = chatVisible && chatTexture != 0;
         glUniform1i(uChatVisible, showChat ? 1 : 0);
         glUniform1f(uChatFraction, chatFraction);
+        glUniform1f(uChatWidth, chatWidthFraction);
 
         if (showChat)
         {
@@ -235,6 +367,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
     }
+
 
     private void uploadWorld(World world)
     {
@@ -309,9 +442,13 @@ public final class GpuWorldRenderer implements AutoCloseable
     {
         glDeleteProgram(raycastProgram);
         glDeleteProgram(blitProgram);
-        glDeleteTextures(new int[] { colorTexture, depthTexture, worldTexture, atlasTexture });
+        glDeleteProgram(spriteProgram);
+        glDeleteTextures(new int[] { colorTexture, depthTexture, worldTexture, atlasTexture, spriteTexture });
         glDeleteFramebuffers(framebuffer);
+        glDeleteRenderbuffers(depthRenderbuffer);
         glDeleteVertexArrays(emptyVao);
+        glDeleteVertexArrays(spriteVao);
+        glDeleteBuffers(spriteVbo);
         MemoryUtil.memFree(worldUpload);
     }
 }
