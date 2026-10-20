@@ -19,7 +19,7 @@ public class Main {
 	public static final int HEIGHT = 200;
 
 	public static final int SCALE = 4;
-	public static final String TITLE = "Retro Craft";
+	public static final String TITLE = "ClassicCraft";
 
 	public static void main(String[] av) {
 		new Main();

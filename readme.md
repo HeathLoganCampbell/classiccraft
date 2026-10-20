@@ -1,6 +1,10 @@
-# Retro Craft
-A Voxel based game that uses no libraries that has an 80's theme.
-This means that No libraries or frameworks like openGL or Unity were used [Up to v0.5 where I added netty for networking]
+# ClassicCraft
+A voxel game with an 80's look. The world is rendered by a per-pixel CPU raycaster,
+with an optional fragment-shader GPU backend.
+
+ClassicCraft is a standalone fork of
+[Retro Craft](https://github.com/HeathLoganCampbell/Retro-Craft). The original used no
+libraries beyond the JDK; the GPU backend is an opt-in exception.
 
 [![Youtube video of Retro Craft](https://img.youtube.com/vi/m63pDKehByg/0.jpg)](https://www.youtube.com/watch?v=m63pDKehByg)
 

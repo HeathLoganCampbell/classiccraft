@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (experimental)
 - **Date:** 2026-10-20
-- **Deciders:** Retro Craft contributors
+- **Deciders:** Heath Logan Campbell
 - **Tags:** rendering, performance, gpu
 
 ## Context

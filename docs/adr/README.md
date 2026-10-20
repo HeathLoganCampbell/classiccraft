@@ -35,3 +35,4 @@ including the trade-offs that are now visible with hindsight.
 | [0013](0013-maven-build.md) | Build with Maven | Accepted |
 | [0014](0014-shared-common-module.md) | Share one `common` package between client and server | Accepted |
 | [0015](0015-render-players-as-sprites.md) | Render other players as 2D sprites | Accepted |
+| [0016](0016-gpu-raycast-backend.md) | Optional GPU raycast backend | Accepted (experimental) |

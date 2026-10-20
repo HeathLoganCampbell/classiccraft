@@ -128,7 +128,7 @@ public final class GpuMain
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         window = glfwCreateWindow(Main.WIDTH * Main.SCALE, Main.HEIGHT * Main.SCALE,
-                "Retro Craft (GPU)", NULL, NULL);
+                "ClassicCraft (GPU)", NULL, NULL);
 
         if (window == NULL)
             throw new IllegalStateException("Could not create a GLFW window");
@@ -273,7 +273,7 @@ public final class GpuMain
                 {
                     Location location = player.getLocation();
                     glfwSetWindowTitle(window, String.format(
-                            "Retro Craft (GPU) - %dx%d -> %dx%d - %d fps - %.1f %.1f %.1f - %s",
+                            "ClassicCraft (GPU) - %dx%d -> %dx%d - %d fps - %.1f %.1f %.1f - %s",
                             Main.WIDTH, Main.HEIGHT,
                             Main.WIDTH * Main.SCALE, Main.HEIGHT * Main.SCALE,
                             fpsFrames,
