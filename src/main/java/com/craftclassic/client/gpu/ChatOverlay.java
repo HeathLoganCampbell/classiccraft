@@ -54,6 +54,9 @@ public final class ChatOverlay implements AutoCloseable
     private long showUntil;
     private boolean dirty = true;
     private boolean wasVisible;
+    private String username = "";
+    private long cursorEpoch = System.currentTimeMillis();
+    private boolean cursorVisible = true;
 
     public ChatOverlay(int width, int bandHeight)
     {
@@ -88,6 +91,12 @@ public final class ChatOverlay implements AutoCloseable
         dirty = true;
     }
 
+    public synchronized void setUsername(String username)
+    {
+        this.username = username == null ? "" : username;
+        this.dirty = true;
+    }
+
     public synchronized boolean isOpen()
     {
         return open;
@@ -97,7 +106,14 @@ public final class ChatOverlay implements AutoCloseable
     {
         this.open = open;
         this.showUntil = open ? Long.MAX_VALUE : System.currentTimeMillis() + VISIBLE_MILLIS;
+        resetCursorBlink();
         this.dirty = true;
+    }
+
+    private void resetCursorBlink()
+    {
+        this.cursorEpoch = System.currentTimeMillis();
+        this.cursorVisible = true;
     }
 
     public synchronized void append(char character)
@@ -106,6 +122,7 @@ public final class ChatOverlay implements AutoCloseable
             return;
 
         input.append(character);
+        resetCursorBlink();
         dirty = true;
     }
 
@@ -121,12 +138,14 @@ public final class ChatOverlay implements AutoCloseable
             return;
 
         input.setLength(input.length() - 1);
+        resetCursorBlink();
         dirty = true;
     }
 
     public synchronized void clearInput()
     {
         input.setLength(0);
+        resetCursorBlink();
         dirty = true;
     }
 
@@ -137,7 +156,7 @@ public final class ChatOverlay implements AutoCloseable
 
     public synchronized boolean isVisible()
     {
-        return open || System.currentTimeMillis() < showUntil;
+        return open || (!messages.isEmpty() && System.currentTimeMillis() < showUntil);
     }
 
     /**
@@ -150,6 +169,16 @@ public final class ChatOverlay implements AutoCloseable
         {
             wasVisible = false;
             return;
+        }
+
+        if (open)
+        {
+            boolean visible = (System.currentTimeMillis() - cursorEpoch) % 1000L < 500L;
+            if (visible != cursorVisible)
+            {
+                cursorVisible = visible;
+                dirty = true;
+            }
         }
 
         if (dirty || !wasVisible)
@@ -165,16 +194,30 @@ public final class ChatOverlay implements AutoCloseable
     {
         Arrays.fill(pixels, BACKGROUND);
 
-        int inputY = height - LINE_HEIGHT - 3;
-        String prompt = "MSG: " + input;
-        drawText(4, inputY, prompt, INPUT_TEXT);
+        int lineY;
 
-        // Cursor: the font has no underscore, so draw a small block.
-        int cursorX = 4 + prompt.length() * ADVANCE;
-        for (int y = inputY; y < inputY + GLYPH_HEIGHT; y++)
-            putPixel(cursorX, y, INPUT_TEXT);
+        if (open)
+        {
+            int inputY = height - LINE_HEIGHT - 6;
+            String prompt = (username.isEmpty() ? "MSG: " : username + ": ") + input;
+            drawText(4, inputY, prompt, INPUT_TEXT);
 
-        int lineY = inputY - LINE_HEIGHT;
+            // Cursor: the font has no underscore, so draw a small block.
+            if (cursorVisible)
+            {
+                int cursorX = 4 + prompt.length() * ADVANCE;
+                for (int y = inputY; y < inputY + GLYPH_HEIGHT; y++)
+                    putPixel(cursorX, y, INPUT_TEXT);
+            }
+
+            lineY = inputY - LINE_HEIGHT;
+        }
+        else
+        {
+            // Closed: recent messages only, starting at the bottom.
+            lineY = height - LINE_HEIGHT - 6;
+        }
+
         for (int i = messages.size() - 1; i >= 0 && lineY >= 2; i--)
         {
             drawText(4, lineY, messages.get(i), TEXT);

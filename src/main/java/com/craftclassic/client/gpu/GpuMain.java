@@ -175,6 +175,7 @@ public final class GpuMain implements ClientBridge.View
 
             renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT, Main.FOCAL);
             chat = new ChatOverlay(Main.WIDTH * 2, CHAT_BAND_HEIGHT);
+            chat.setUsername(playerName);
             ClientBridge.view = this;
 
             if (serverHost != null)
@@ -564,7 +565,7 @@ public final class GpuMain implements ClientBridge.View
         if (nettyClient != null && nettyClient.isConnected())
             nettyClient.sendPacket(new ChatMessagePacket(text));
         else
-            chat.addMessage("", text);
+            chat.addMessage(playerName, text);
     }
 
     private static void releaseMovementKeys()
@@ -575,6 +576,48 @@ public final class GpuMain implements ClientBridge.View
         Input.setKey(KeyEvent.VK_D, false);
         Input.setKey(KeyEvent.VK_SPACE, false);
         Input.setKey(KeyEvent.VK_CONTROL, false);
+    }
+
+    private void writeChatComposite(String path)
+    {
+        int width = Main.WIDTH * Main.SCALE;
+        int height = Main.HEIGHT * Main.SCALE;
+        int target = glGenFramebuffers();
+        int colour = glGenTextures();
+
+        glBindTexture(GL_TEXTURE_2D, colour);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, target);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colour, 0);
+
+        renderer.blit(width, height, chat.getTexture(), chat.isVisible(),
+                (float) chat.getHeight() / 2.0f / Main.HEIGHT);
+
+        ByteBuffer composed = MemoryUtil.memAlloc(width * height * 4);
+        try
+        {
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, composed);
+            GlUtil.writePng(width, height, composed, path);
+            System.out.println("Wrote       " + path);
+        }
+        catch (Exception e)
+        {
+            System.err.println("Could not write " + path + ": " + e.getMessage());
+        }
+        finally
+        {
+            MemoryUtil.memFree(composed);
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glReadBuffer(GL_BACK);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDeleteFramebuffers(target);
+        glDeleteTextures(colour);
     }
 
     private void renderFrame()
@@ -675,48 +718,14 @@ public final class GpuMain implements ClientBridge.View
 
         if (chatDemo)
         {
-            // Compose through the blit shader into an offscreen target, so the
-            // test never touches the (hidden) window's back buffer.
-            int target = glGenFramebuffers();
-            int colour = glGenTextures();
+            writeChatComposite("gpu-chat.png");
 
-            glBindTexture(GL_TEXTURE_2D, colour);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Main.WIDTH, Main.HEIGHT, 0,
-                    GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+            // Closing the input should keep the recent messages but drop the
+            // input line and cursor.
+            chat.setOpen(false);
+            chat.update();
+            writeChatComposite("gpu-chat-closed.png");
 
-            glBindFramebuffer(GL_FRAMEBUFFER, target);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colour, 0);
-
-            renderer.blit(Main.WIDTH, Main.HEIGHT, chat.getTexture(), chat.isVisible(),
-                    (float) chat.getHeight() / Main.HEIGHT);
-
-            ByteBuffer composed = MemoryUtil.memAlloc(Main.WIDTH * Main.HEIGHT * 4);
-            try
-            {
-                glReadBuffer(GL_COLOR_ATTACHMENT0);
-                glPixelStorei(GL_PACK_ALIGNMENT, 1);
-                glReadPixels(0, 0, Main.WIDTH, Main.HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, composed);
-                GlUtil.writePng(Main.WIDTH, Main.HEIGHT, composed, "gpu-chat.png");
-                System.out.println("Wrote       gpu-chat.png");
-            }
-            catch (Exception e)
-            {
-                System.err.println("Could not write gpu-chat.png: " + e.getMessage());
-            }
-            finally
-            {
-                MemoryUtil.memFree(composed);
-            }
-
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glReadBuffer(GL_BACK);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glDeleteFramebuffers(target);
-            glDeleteTextures(colour);
-
-            // The hidden window's Metal context blocks in glfwDestroyWindow
-            // after this offscreen composite; the process is a test run, so
-            // skip the destroy and exit after GL cleanup instead.
             skipWindowDestroy = true;
         }
 
