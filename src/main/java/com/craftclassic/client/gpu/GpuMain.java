@@ -4,6 +4,7 @@ import com.craftclassic.client.Main;
 import com.craftclassic.client.input.Input;
 import com.craftclassic.client.net.NettyClient;
 import com.craftclassic.common.GameSettings;
+import com.craftclassic.common.blocks.Block;
 import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.entities.Player;
 import com.craftclassic.common.network.ClientBridge;
@@ -94,6 +95,7 @@ public final class GpuMain implements ClientBridge.View
     private int windowY = 0;
     private boolean waterDemo = false;
     private boolean spriteDemo = false;
+    private boolean photo = false;
     private double exitAfterSeconds = -1.0;
     private double openChatAfterSeconds = -1.0;
     private boolean skipWindowDestroy = false;
@@ -174,6 +176,9 @@ public final class GpuMain implements ClientBridge.View
                     break;
                 case "--sprite-demo":
                     spriteDemo = true;
+                    break;
+                case "--photo":
+                    photo = true;
                     break;
                 case "--exit-after":
                     exitAfterSeconds = Double.parseDouble(args[++i]);
@@ -750,6 +755,42 @@ public final class GpuMain implements ClientBridge.View
             location.setPitch(-0.0012f);
         }
 
+        if (photo)
+        {
+            location.setYaw(0.0f);
+            location.setPitch(0.0f);
+
+            float z = location.getZ() + 2.5f;
+            int blockX = (int) Math.floor(location.getX()) - 64;
+            int blockZ = (int) Math.floor(location.getZ()) - 64;
+            int top = 63;
+            for (int y = 0; y < 64; y++)
+            {
+                if (world.getBlock(blockX, y, blockZ) != Block.AIR)
+                {
+                    top = y;
+                    break;
+                }
+            }
+
+            Entity remote = new Entity("ALEX", 1);
+            remote.setLocation(new Location(world, location.getX(), top + 62.55f, z));
+            world.addEntity(remote);
+
+            // Lift the camera a little and look down at the second player so the
+            // whole model reads clearly in the screenshot.
+            float targetY = top + 62.55f + 0.55f;
+            location.setY(location.getY() - 1.2f);
+            float drop = targetY - location.getY();
+            float dist = Math.max(0.001f, z - location.getZ());
+            location.setPitch((float) (-Math.atan2(drop, dist) / 100.0));
+
+            chat.addMessage("ALEX", "&aHEY, CAN YOU SEE ME?");
+            chat.addMessage("HEATH", "&eYEP! NICE EARS.");
+            chat.setOpen(false);
+            chat.update();
+        }
+
         if (spriteDemo)
         {
             location.setYaw(0.0f);
@@ -807,6 +848,13 @@ public final class GpuMain implements ClientBridge.View
                 Main.WIDTH * Main.HEIGHT,
                 (Main.WIDTH * Main.HEIGHT) / (milliseconds / 1000.0) / 1_000_000.0);
         System.out.println("Wrote       gpu-frame.png");
+
+        if (photo)
+        {
+            writeChatComposite("readme-resources/classicraft-v1.2.png");
+            skipWindowDestroy = true;
+            return;
+        }
 
         if (chatDemo)
         {

@@ -206,3 +206,13 @@ Because it sounded better
 * Block break/place restored on the GPU path, with the targeted block outlined
 * `--max-fps` for 500+ fps, and a fixed 20 TPS server
 * 102 JUnit 5 tests over the shared simulation and network layers
+
+### v1.2 [21/10/2026]
+![ClassicCraft v1.2](./readme-resources/classiccraft-v1.2.png)
+* Remote players are visible as camera-facing bunny billboards, lit and depth-tested
+* Chat commands: `/ping` (real round-trip ms), `/msg`/`/tell`/`/w`, `/list`, `/help`
+* Chat box is 40% of the screen, 30% larger text, fades out when idle, blinking cursor
+* `CLASSICCRAFT_USERNAME` (or `--name`) names your player in chat and on the scoreboard
+* Scriptable server plugins: JavaScript/TypeScript hosted in-process by GraalJS
+* Two players on one machine: `--window-size` and `--pos`; `F1` releases the mouse
+* 146 JUnit 5 tests over the simulation, network and plugin layers
