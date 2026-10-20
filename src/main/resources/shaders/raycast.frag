@@ -22,6 +22,7 @@ uniform vec2  uResolution;
 uniform float uFov;
 uniform float uFogDist;
 uniform vec3  uSky;
+uniform ivec3 uTarget;          // targeted block; x < 0 means none
 
 const ivec3 kWorldSize = ivec3(64, 64, 64);
 const ivec3 kOrigin    = ivec3(64, 64, 64);
@@ -109,9 +110,20 @@ void main()
             texY = (int(hit.y * 16.0) & 15) + 16;
         }
 
-        // Stored value is textureId + 1 so that 0 can keep meaning "air".
-        int textureSlot = int(id) - 1;
-        color = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
+        // Stored value is (textureId + 1) with bit 7 set when the block is
+        // selectable, so 0 can keep meaning "air".
+        int  textureSlot = int(id & 127u) - 1;
+        bool selectable  = (id & 128u) != 0u;
+
+        vec3 texel = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
+
+        // Same highlight rule as CrossHair/World.render: the edge texels of the
+        // targeted block's face, for selectable blocks only.
+        bool onEdge = texX == 0 || texX == 15 || (texY & 15) == 0 || (texY & 15) == 15;
+        if (selectable && uTarget.x >= 0 && all(equal(cell - kOrigin, uTarget)) && onEdge)
+            texel = vec3(1.0, 1.0, 0.0);
+
+        color = texel;
 
         float shade = (255.0 - float((axis + 2) % 3) * 50.0) / 255.0;   // fake face lighting
         float fog   = clamp(1.0 - t / uFogDist, 0.0, 1.0);

@@ -6,6 +6,7 @@ import com.craftclassic.common.GameSettings;
 import com.craftclassic.common.entities.Player;
 import com.craftclassic.common.utils.Location;
 import com.craftclassic.common.utils.Vector;
+import com.craftclassic.common.world.Raycast;
 import com.craftclassic.common.world.World;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
@@ -291,6 +292,7 @@ public final class GpuMain
                 normaliseYaw();
             }
 
+            updateTargetBlock();
             renderFrame();
 
             glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
@@ -321,6 +323,31 @@ public final class GpuMain
         }
     }
 
+    /**
+     * The CPU renderer discovered the targeted block inside World.render(). The
+     * GPU client does not run that loop, so cast one ray through the crosshair.
+     */
+    private void updateTargetBlock()
+    {
+        Location location = player.getLocation();
+
+        Raycast.Hit hit = Raycast.cast(world,
+                location.getX(), location.getY(), location.getZ(),
+                location.getYaw(), location.getPitch(), Raycast.DEFAULT_REACH);
+
+        if (hit == null)
+        {
+            player.setTargetBlock(null);
+            player.setTargetBlockPlace(null);
+            renderer.clearTarget();
+            return;
+        }
+
+        player.setTargetBlock(new Location(world, hit.getX(), hit.getY(), hit.getZ()));
+        player.setTargetBlockPlace(new Location(world, hit.getPlaceX(), hit.getPlaceY(), hit.getPlaceZ()));
+        renderer.setTarget(hit.getX(), hit.getY(), hit.getZ());
+    }
+
     private void renderFrame()
     {
         Location location = player.getLocation();
@@ -348,6 +375,7 @@ public final class GpuMain
         Location location = player.getLocation();
         location.setYaw(0.7f);
         location.setPitch(-0.0012f);
+        updateTargetBlock();
 
         renderFrame();
         glFinish();

@@ -51,6 +51,7 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int uFov;
     private final int uFogDist;
     private final int uSky;
+    private final int uTarget;
 
     private final int uFrame;
     private final int uLowRes;
@@ -59,6 +60,7 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final ByteBuffer worldUpload = MemoryUtil.memAlloc(WORLD_SIZE * WORLD_SIZE * WORLD_SIZE);
     private long uploadedVersion = Long.MIN_VALUE;
     private int uploadCount;
+    private int targetX = -1, targetY = -1, targetZ = -1;
 
     public GpuWorldRenderer(int width, int height)
     {
@@ -79,6 +81,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uFov = uniform(raycastProgram, "uFov");
         this.uFogDist = uniform(raycastProgram, "uFogDist");
         this.uSky = uniform(raycastProgram, "uSky");
+        this.uTarget = uniform(raycastProgram, "uTarget");
 
         this.uFrame = uniform(blitProgram, "uFrame");
         this.uLowRes = uniform(blitProgram, "uLowRes");
@@ -168,6 +171,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         glUniform1f(uFov, fov);
         glUniform1f(uFogDist, 50.0f);
         glUniform3f(uSky, 0xA7 / 255.0f, 0xC9 / 255.0f, 0xEB / 255.0f);
+        glUniform3i(uTarget, targetX, targetY, targetZ);
 
         GlUtil.bindTexture(0, worldTexture, GL_TEXTURE_3D);
         GlUtil.bindTexture(1, atlasTexture, GL_TEXTURE_2D);
@@ -205,8 +209,13 @@ public final class GpuWorldRenderer implements AutoCloseable
         {
             Block block = data[i];
             // Texture id, not block id: grass is block 2 but atlas slot 0.
-            // +1 keeps 0 free for air.
-            worldUpload.put(i, (byte) (block == null ? 0 : block.getTextureId() + 1));
+            // +1 keeps 0 free for air, bit 7 carries "selectable".
+            // Air is stored as a real Block.AIR instance, not null.
+            if (block == null || block.getTextureId() < 0)
+                worldUpload.put(i, (byte) 0);
+            else
+                worldUpload.put(i, (byte) ((block.getTextureId() + 1)
+                        | (block.isSelectable() ? 0x80 : 0)));
         }
 
         glBindTexture(GL_TEXTURE_3D, worldTexture);
@@ -216,6 +225,19 @@ public final class GpuWorldRenderer implements AutoCloseable
 
         uploadedVersion = world.blockVersion;
         uploadCount++;
+    }
+
+    /** Block under the crosshair, or x < 0 for none; used for the highlight. */
+    public void setTarget(int x, int y, int z)
+    {
+        this.targetX = x;
+        this.targetY = y;
+        this.targetZ = z;
+    }
+
+    public void clearTarget()
+    {
+        setTarget(-1, -1, -1);
     }
 
     /** Number of times the world texture has been (re)uploaded. */
