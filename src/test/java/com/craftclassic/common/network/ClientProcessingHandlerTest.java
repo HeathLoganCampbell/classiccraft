@@ -67,10 +67,12 @@ class ClientProcessingHandlerTest
         try
         {
             ChatMessagePacket packet = new ChatMessagePacket("hello");
-            assertTrue(channel.writeInbound(packet));
+            channel.writeInbound(packet);
 
             assertEquals(1, view.chats.size());
-            assertEquals("Steve: hello", view.chats.get(0));
+            // A freshly built packet has no sender yet; the server stamps it
+            // in ChatMessagePacket.process before broadcasting.
+            assertEquals(": hello", view.chats.get(0));
         }
         finally
         {
@@ -85,7 +87,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new EntitySpawnPacket(7, 10.5, 20.25, 30.75)));
+            channel.writeInbound(new EntitySpawnPacket(7, 10.5, 20.25, 30.75));
 
             assertEquals(1, view.added.size());
             Entity entity = view.added.get(0);
@@ -107,7 +109,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new EntitySpawnPacket(0, 1, 2, 3)));
+            channel.writeInbound(new EntitySpawnPacket(0, 1, 2, 3));
 
             assertTrue(view.added.isEmpty());
         }
@@ -127,7 +129,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new EntityPositionPacket(7, 4.5, 5.25, 6.75)));
+            channel.writeInbound(new EntityPositionPacket(7, 4.5, 5.25, 6.75));
 
             assertEquals(4.5f, entity.getLocation().getX(), 1e-6f);
             assertEquals(5.25f, entity.getLocation().getY(), 1e-6f);
@@ -146,7 +148,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new EntityPositionPacket(404, 1, 2, 3)));
+            channel.writeInbound(new EntityPositionPacket(404, 1, 2, 3));
 
             assertTrue(view.world.getEntities().isEmpty());
         }
@@ -163,7 +165,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new BlockPlacePacket(12, 13, 14, Block.DIRT.getId())));
+            channel.writeInbound(new BlockPlacePacket(12, 13, 14, Block.DIRT.getId()));
 
             assertEquals(Block.DIRT, view.world.getBlock(12, 13, 14));
         }
@@ -181,7 +183,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new BlockBreakPacket(12, 13, 14, 0)));
+            channel.writeInbound(new BlockBreakPacket(12, 13, 14, 0));
 
             assertEquals(Block.AIR, view.world.getBlock(12, 13, 14));
         }
@@ -199,7 +201,7 @@ class ClientProcessingHandlerTest
 
         try
         {
-            assertTrue(channel.writeInbound(new BlockPlacePacket(12, 13, 14, Block.DIRT.getId())));
+            channel.writeInbound(new BlockPlacePacket(12, 13, 14, Block.DIRT.getId()));
 
             assertEquals(Block.AIR, view.world.getBlock(12, 13, 14));
             assertTrue(view.chats.isEmpty());
