@@ -15,6 +15,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.nio.ByteBuffer;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -58,6 +59,8 @@ public final class GpuMain
     private int ticksPerSecond = REFERENCE_TICKS_PER_SECOND;
     private double tickSeconds = 1.0 / REFERENCE_TICKS_PER_SECOND;
     private float speedMultiplier = 2.0f;
+    private int maxFramesPerSecond = 0;   // 0 = vsync
+    private boolean logFps = false;
 
     public static void main(String[] args)
     {
@@ -92,6 +95,12 @@ public final class GpuMain
                 case "--speed":
                     speedMultiplier = Float.parseFloat(args[++i]);
                     break;
+                case "--max-fps":
+                    maxFramesPerSecond = Integer.parseInt(args[++i]);
+                    break;
+                case "--log-fps":
+                    logFps = true;
+                    break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
                     break;
@@ -120,6 +129,8 @@ public final class GpuMain
                     + " -> " + (Main.WIDTH * Main.SCALE) + "x" + (Main.HEIGHT * Main.SCALE));
             System.out.println("World:    " + (naturalTerrain ? "natural" : "flat") + ", seed " + seed);
             System.out.println("Sim:      " + ticksPerSecond + " ticks/s, speed x" + speedMultiplier);
+            System.out.println("Frames:   " + (maxFramesPerSecond > 0
+                    ? maxFramesPerSecond + " fps cap (vsync off)" : "vsync"));
 
             if (selfTest)
                 runSelfTest(selfTestFrames);
@@ -161,7 +172,7 @@ public final class GpuMain
             throw new IllegalStateException("Could not create a GLFW window");
 
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(hidden ? 0 : 1);
+        glfwSwapInterval(hidden || maxFramesPerSecond > 0 ? 0 : 1);
 
         if (!hidden)
             glfwFocusWindow(window);
@@ -259,6 +270,9 @@ public final class GpuMain
         int[] framebufferWidth = new int[1];
         int[] framebufferHeight = new int[1];
 
+        long frameNanos = maxFramesPerSecond > 0 ? 1_000_000_000L / maxFramesPerSecond : 0L;
+        long nextFrame = System.nanoTime();
+
         while (!glfwWindowShouldClose(window))
         {
             glfwPollEvents();
@@ -301,6 +315,17 @@ public final class GpuMain
 
             glfwSwapBuffers(window);
 
+            if (frameNanos > 0)
+            {
+                nextFrame += frameNanos;
+                long frameNow = System.nanoTime();
+
+                if (nextFrame > frameNow)
+                    LockSupport.parkNanos(nextFrame - frameNow);
+                else if (frameNow - nextFrame > frameNanos * 4)
+                    nextFrame = frameNow;
+            }
+
             fpsFrames++;
             if (now > fpsTimestamp + 1_000_000_000L)
             {
@@ -316,6 +341,9 @@ public final class GpuMain
                             com.craftclassic.common.blocks.Block
                                     .getBlockById(GameSettings.placeBlockTypeId).getName()));
                 }
+
+                if (logFps)
+                    System.out.println("fps: " + fpsFrames);
 
                 fpsTimestamp = now;
                 fpsFrames = 0;

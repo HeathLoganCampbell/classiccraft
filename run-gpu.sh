@@ -7,6 +7,7 @@
 #   ./run-gpu.sh --flat          interactive, the old flat world
 #   ./run-gpu.sh --tps 120       simulation rate, independent of the frame rate
 #   ./run-gpu.sh --speed 1.5     movement multiplier
+#   ./run-gpu.sh --max-fps 500   uncap vsync and target a frame rate
 #   ./run-gpu.sh --selftest 120  render offscreen, write gpu-frame.png, exit
 #
 set -euo pipefail

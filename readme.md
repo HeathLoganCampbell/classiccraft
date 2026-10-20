@@ -59,6 +59,7 @@ an optional backend, not a replacement.
 ./run-gpu.sh --flat          # the old flat world
 ./run-gpu.sh --tps 120       # simulation rate (default 60, independent of fps)
 ./run-gpu.sh --speed 1.0     # movement multiplier (default 2.0)
+./run-gpu.sh --max-fps 500   # uncap vsync and target 500 fps
 ./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
 ```
 
