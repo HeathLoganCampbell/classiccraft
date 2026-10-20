@@ -103,7 +103,7 @@ public class Player extends LivingEntity
 		// like you can on the ground (5% of ground acceleration).
 		if(!onGround)
 		{
-			speed *= 0.05f;
+			speed *= 0.06f;
 		}
 
 		float accX = (float)((Input.getKey(KeyEvent.VK_D) ? 1 : 0) - (Input.getKey(KeyEvent.VK_A) ? 1 : 0)) * speed;
