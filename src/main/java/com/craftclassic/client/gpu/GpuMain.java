@@ -37,8 +37,8 @@ public final class GpuMain
     private static final int REFERENCE_TICKS_PER_SECOND = 60;
     private static final int MAX_CATCH_UP_TICKS = 4;
 
-    /** Matches MouseGrabberListener: 0.03 * Entity.turn's 0.00015 rad per pixel. */
-    private static final float MOUSE_SENSITIVITY = 0.03f;
+    /** 2x MouseGrabberListener's 0.03 factor (Entity.turn adds 0.00015 rad per unit). */
+    private static final float MOUSE_SENSITIVITY = 0.06f;
 
     private long window;
     private GpuWorldRenderer renderer;
