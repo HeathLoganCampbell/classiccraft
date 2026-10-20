@@ -10,6 +10,7 @@ public class LavaBlock extends Block {
 		this.setBreakable(false);
 		this.setSelectable(false);
 		this.setSolid(false);
+		this.setTicking(true);
 	}
 	
 	private void flow(Location location, int x, int y, int z)
@@ -18,7 +19,7 @@ public class LavaBlock extends Block {
 		if(location.getBlock() == Block.AIR)
 		{
 			Location newLoc = location.clone();
-			location.getWorld().getMinecraft().doNextTick(() -> 
+			location.getWorld().scheduleLiquidTick(() -> 
 			{
 				if(newLoc.getBlock() == Block.AIR)
 					newLoc.setBlock(Block.LAVA);

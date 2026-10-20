@@ -63,9 +63,10 @@ void main()
     int   axis     = 0;
     uint  id       = 0u;
 
-    vec3  color    = vec3(0.0);
-    float coverage = 0.0;
-    float depth    = 1e9;
+    vec3  color       = vec3(0.0);
+    float coverage    = 0.0;
+    float depth       = 1e9;
+    bool  insideWater = false;
 
     for (int i = 0; i < 512; ++i)
     {
@@ -77,80 +78,89 @@ void main()
 
         if (id != 0u)
         {
-            vec3 hit = cam + dir * t;
-
-            int texX;
-            int texY;
-
-            if (axis == 1)
-            {
-                // Top/bottom face.
-                texX = int(hit.x * 16.0) & 15;
-                texY = int(hit.z * 16.0) & 15;
-                if (dir.y < 0.0)
-                    texY += 32;
-            }
-            else
-            {
-                // Side faces, projected on the (x + z) diagonal like the CPU path.
-                texX = int((hit.x + hit.z) * 16.0) & 15;
-                texY = (int(hit.y * 16.0) & 15) + 16;
-            }
-
             // Stored value is (textureId + 1) with bit 7 set when the block is
             // selectable, so 0 can keep meaning "air".
             int  textureSlot = int(id & 127u) - 1;
             bool selectable  = (id & 128u) != 0u;
             bool isWater     = textureSlot == kWaterSlot;
 
-            if (depth > 1e8)
-                depth = t;
-
-            if (isWater)
+            if (isWater && insideWater)
             {
-                // Animate the tile and add a moving brightness wave so the
-                // surface reads as moving even though the texture is a single
-                // tile.
-                texX = (texX + int(uTime * 6.0)) & 15;
-                texY = (texY + int(uTime * 4.0)) & 15;
-            }
-
-            vec3 texel = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
-
-            if (isWater)
-            {
-                float wave = sin(hit.x * 2.2 + uTime * 2.0) * 0.5
-                           + sin(hit.z * 1.7 - uTime * 1.3) * 0.5;
-                texel *= 0.85 + 0.22 * wave;
+                // Internal boundary between two water cells: draw no face, so
+                // the water volume does not show vertical "walls" as the ray
+                // steps from cell to cell.
             }
             else
             {
-                bool onEdge = texX == 0 || texX == 15 || (texY & 15) == 0 || (texY & 15) == 15;
-                if (selectable && uTarget.x >= 0 && all(equal(b, uTarget)) && onEdge)
-                    texel = vec3(1.0, 1.0, 0.0);
-            }
+                vec3 hit = cam + dir * t;
 
-            float shade = (255.0 - float((axis + 2) % 3) * 50.0) / 255.0;
-            float fog   = clamp(1.0 - t / uFogDist, 0.0, 1.0);
-            vec3  lit   = texel * shade * fog;
+                int texX;
+                int texY;
 
-            if (isWater)
-            {
-                // Front-to-back blend; each water cell adds tint and keeps the
-                // ray going so the bottom stays visible.
-                float alpha = 0.55;
-                color    += (1.0 - coverage) * alpha * lit;
-                coverage += (1.0 - coverage) * alpha;
+                if (axis == 1)
+                {
+                    // Top/bottom face.
+                    texX = int(hit.x * 16.0) & 15;
+                    texY = int(hit.z * 16.0) & 15;
+                    if (dir.y < 0.0)
+                        texY += 32;
+                }
+                else
+                {
+                    // Side faces, projected on the (x + z) diagonal like the CPU path.
+                    texX = int((hit.x + hit.z) * 16.0) & 15;
+                    texY = (int(hit.y * 16.0) & 15) + 16;
+                }
 
-                if (coverage > 0.95)
+                if (depth > 1e8)
+                    depth = t;
+
+                if (isWater)
+                {
+                    texX = (texX + int(uTime * 6.0)) & 15;
+                    texY = (texY + int(uTime * 4.0)) & 15;
+                }
+
+                vec3 texel = texelFetch(uAtlas, ivec2(texX, texY + textureSlot * kAtlasRows), 0).rgb;
+
+                if (isWater)
+                {
+                    float wave = sin(hit.x * 2.2 + uTime * 2.0) * 0.5
+                               + sin(hit.z * 1.7 - uTime * 1.3) * 0.5;
+                    texel *= 0.85 + 0.22 * wave;
+                }
+                else
+                {
+                    bool onEdge = texX == 0 || texX == 15 || (texY & 15) == 0 || (texY & 15) == 15;
+                    if (selectable && uTarget.x >= 0 && all(equal(b, uTarget)) && onEdge)
+                        texel = vec3(1.0, 1.0, 0.0);
+                }
+
+                float shade = (255.0 - float((axis + 2) % 3) * 50.0) / 255.0;
+                float fog   = clamp(1.0 - t / uFogDist, 0.0, 1.0);
+                vec3  lit   = texel * shade * fog;
+
+                if (isWater)
+                {
+                    float alpha = 0.55;
+                    color    += (1.0 - coverage) * alpha * lit;
+                    coverage += (1.0 - coverage) * alpha;
+                    insideWater = true;
+
+                    if (coverage > 0.95)
+                        break;
+                }
+                else
+                {
+                    color += (1.0 - coverage) * lit;
+                    coverage = 1.0;
                     break;
+                }
             }
-            else
-            {
-                color += (1.0 - coverage) * lit;
-                coverage = 1.0;
-                break;
-            }
+        }
+        else
+        {
+            insideWater = false;
         }
 
         if (tMax.x < tMax.y)

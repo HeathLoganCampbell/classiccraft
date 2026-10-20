@@ -31,6 +31,8 @@ public class World implements IWorld
 	private Minecraft minecraft;
 	
 	private List<Entity> entities;
+	private final List<Runnable> liquidTasks = new ArrayList<>();
+	private long tickCount = 0;
 
 	public static float fogDistance = 50f;
 
@@ -163,6 +165,20 @@ public class World implements IWorld
 			entity.tick();
 		}
 
+		// Liquids schedule one-block flows. At the 60 TPS client, every third
+		// tick is 20 Hz, the same cadence the old ~200 TPS client got from
+		// tickCount % 10 in Minecraft.tick.
+		if(this.tickCount % 3 == 0 && !this.liquidTasks.isEmpty())
+		{
+			List<Runnable> tasks = new ArrayList<>(this.liquidTasks);
+			this.liquidTasks.clear();
+
+			for(Runnable task : tasks)
+				task.run();
+		}
+
+		this.tickCount++;
+
 		// Only blocks that actually simulate (liquids, sand, TNT) need a Location
 		// allocated and a virtual call. The old version did both for all 262,144
 		// positions every tick, which made the tick - not the renderer - the
@@ -174,7 +190,7 @@ public class World implements IWorld
 				for (int x = 0; x < this.width; ++x)
 				{
 					Block block = this.blockData[x + y * 64 + z * 4096];
-					if(block == null || block == Block.AIR || !block.isPhysics())
+					if(block == null || block == Block.AIR || !block.isTicking())
 						continue;
 
 					block.onTick(new Location(this, x, y, z));
@@ -508,6 +524,12 @@ public class World implements IWorld
 				}
 			}
 		}
+	}
+
+	/** Queues one block of liquid flow, run on the next liquid tick. */
+	public void scheduleLiquidTick(Runnable task)
+	{
+		this.liquidTasks.add(task);
 	}
 
 	public Minecraft getMinecraft() {

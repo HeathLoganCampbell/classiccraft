@@ -16,6 +16,7 @@ public class Block
 	private boolean physics = false;
 	private boolean solid = true;
 	private boolean selectable = true;
+	private boolean ticking = false;
 	
 	public Block(int id, String name, int textureId) {
 		super();
@@ -113,6 +114,15 @@ public class Block
 
 	public boolean isPhysics() {
 		return physics;
+	}
+
+	/** True when World.tick should call onTick: physics blocks and liquids. */
+	public boolean isTicking() {
+		return this.physics || this.ticking;
+	}
+
+	public void setTicking(boolean ticking) {
+		this.ticking = ticking;
 	}
 
 	public void setPhysics(boolean physics) {
