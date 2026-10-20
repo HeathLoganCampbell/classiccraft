@@ -756,8 +756,8 @@ public final class GpuMain implements ClientBridge.View
             location.setPitch(0.0f);
 
             Entity remote = new Entity("Remote", 1);
-            remote.setLocation(new Location(world, location.getX(), location.getY() - 2.0f,
-                    location.getZ() + 6.0f));
+            remote.setLocation(new Location(world, location.getX(), location.getY() - 1.0f,
+                    location.getZ() + 3.0f));
             world.addEntity(remote);
         }
 

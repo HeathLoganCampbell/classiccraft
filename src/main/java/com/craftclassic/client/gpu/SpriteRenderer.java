@@ -30,6 +30,8 @@ public final class SpriteRenderer implements AutoCloseable
     private final int vao;
     private final int vbo;
     private final int texture;
+    private final int textureWidth;
+    private final int textureHeight;
 
     private final int uCenter;
     private final int uSize;
@@ -59,7 +61,10 @@ public final class SpriteRenderer implements AutoCloseable
         this.uSprite = uniform("uSprite");
         this.uFogDist = uniform("uFogDist");
 
-        this.texture = GlUtil.playerSpriteTexture("player.png");
+        GlUtil.SpriteTexture sprite = GlUtil.playerSpriteTexture("player.png");
+        this.texture = sprite.id;
+        this.textureWidth = sprite.width;
+        this.textureHeight = sprite.height;
 
         // aPos: x = left..right, y = top..bottom
         float[] quad =
@@ -105,10 +110,11 @@ public final class SpriteRenderer implements AutoCloseable
 
         double cy = Math.cos(scaledYaw);
         double sy = Math.sin(scaledYaw);
-        // A 32x64 sprite at the focal distance covers 32*4 by 64*4 pixels in
-        // the original renderer; convert that to world units.
-        float worldWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
-        float worldHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE / focal;
+        // The texture is cropped to the opaque sprite, so its pixel size is
+        // the visible sprite size. Convert the original pixel scale to world
+        // units at the focal distance.
+        float worldWidth = this.textureWidth * 4.0f * Main.RESOLUTION_SCALE / focal;
+        float worldHeight = this.textureHeight * 4.0f * Main.RESOLUTION_SCALE / focal;
 
         glUseProgram(program);
 

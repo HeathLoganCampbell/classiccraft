@@ -100,6 +100,8 @@ final class GlUtil
                 }
                 pixels.flip();
 
+
+
                 int texture = glGenTextures();
                 glBindTexture(GL_TEXTURE_2D, texture);
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -127,7 +129,21 @@ final class GlUtil
      * flood fill. Interior black pixels (eyes, ear outlines) are kept, unlike
      * a flat colour key, which erases the silhouette.
      */
-    static int playerSpriteTexture(String resourcePath)
+    public static final class SpriteTexture
+    {
+        public final int id;
+        public final int width;
+        public final int height;
+
+        SpriteTexture(int id, int width, int height)
+        {
+            this.id = id;
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    static SpriteTexture playerSpriteTexture(String resourcePath)
     {
         try (InputStream in = GlUtil.class.getClassLoader().getResourceAsStream(resourcePath))
         {
@@ -140,6 +156,7 @@ final class GlUtil
             int[] argb = new int[width * height];
             image.getRGB(0, 0, width, height, argb, 0, width);
 
+            // 1. Flood-fill black connected to the border (the background).
             boolean[] background = new boolean[width * height];
             ArrayDeque<Integer> queue = new ArrayDeque<>();
 
@@ -172,30 +189,179 @@ final class GlUtil
                 if (y + 1 < height) seedBackground(argb, background, queue, width, x, y + 1);
             }
 
-            ByteBuffer pixels = MemoryUtil.memAlloc(width * height * 4);
+            // 2. Remove isolated black specks that are not touching artwork.
+            for (int i = 0; i < argb.length; i++)
+            {
+                if (background[i] || !isBlack(argb[i]))
+                    continue;
+
+                int x = i % width;
+                int y = i / width;
+                boolean touchesArt = false;
+
+                for (int dy = -1; dy <= 1 && !touchesArt; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height)
+                            continue;
+
+                        int neighbour = nx + ny * width;
+                        if (!background[neighbour] && !isBlack(argb[neighbour]))
+                        {
+                            touchesArt = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!touchesArt)
+                    background[i] = true;
+            }
+
+            // 3. Trim one-pixel protrusions (the 1 px ear tips in player.png).
+            boolean[] trim = new boolean[argb.length];
+            for (int i = 0; i < argb.length; i++)
+            {
+                if (background[i])
+                    continue;
+
+                int x = i % width;
+                int y = i / width;
+                int opaque = 0;
+
+                if (x > 0 && !background[i - 1]) opaque++;
+                if (x + 1 < width && !background[i + 1]) opaque++;
+                if (y > 0 && !background[i - width]) opaque++;
+                if (y + 1 < height && !background[i + width]) opaque++;
+
+                if (opaque <= 1)
+                    trim[i] = true;
+            }
+
+            for (int i = 0; i < argb.length; i++)
+            {
+                if (trim[i])
+                    background[i] = true;
+            }
+
+            // 4. Brighten dark silhouette-edge pixels. The source art outlines
+            //    the ears in black; at 5 px wide that reads as a clipped tip.
+            int[] shaded = argb.clone();
+            for (int i = 0; i < argb.length; i++)
+            {
+                if (background[i])
+                    continue;
+
+                int x = i % width;
+                int y = i / width;
+                boolean onEdge = (x > 0 && background[i - 1])
+                        || (x + 1 < width && background[i + 1])
+                        || (y > 0 && background[i - width])
+                        || (y + 1 < height && background[i + width]);
+
+                if (!onEdge)
+                    continue;
+
+                int r = (argb[i] >> 16) & 0xFF;
+                int g = (argb[i] >> 8) & 0xFF;
+                int b = argb[i] & 0xFF;
+                if ((r + g + b) / 3 >= 96)
+                    continue;
+
+                int best = 0xFFFFFFFF;
+                int bestLum = -1;
+
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height)
+                            continue;
+
+                        int n = nx + ny * width;
+                        if (background[n])
+                            continue;
+
+                        int lum = (((argb[n] >> 16) & 0xFF)
+                                + ((argb[n] >> 8) & 0xFF)
+                                + (argb[n] & 0xFF)) / 3;
+
+                        if (lum > bestLum)
+                        {
+                            bestLum = lum;
+                            best = argb[n];
+                        }
+                    }
+                }
+
+                shaded[i] = best;
+            }
+
+            // 5. Crop to the opaque bounds so the quad matches the visible art.
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (background[x + y * width])
+                        continue;
+
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                minX = 0;
+                minY = 0;
+                maxX = width - 1;
+                maxY = height - 1;
+            }
+
+            int croppedWidth = maxX - minX + 1;
+            int croppedHeight = maxY - minY + 1;
+
+            ByteBuffer pixels = MemoryUtil.memAlloc(croppedWidth * croppedHeight * 4);
             try
             {
-                for (int i = 0; i < argb.length; i++)
+                for (int y = minY; y <= maxY; y++)
                 {
-                    int colour = argb[i];
-                    pixels.put((byte) ((colour >> 16) & 0xFF));
-                    pixels.put((byte) ((colour >> 8) & 0xFF));
-                    pixels.put((byte) (colour & 0xFF));
-                    pixels.put((byte) (background[i] ? 0 : 0xFF));
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        int i = x + y * width;
+                        int colour = shaded[i];
+
+                        pixels.put((byte) ((colour >> 16) & 0xFF));
+                        pixels.put((byte) ((colour >> 8) & 0xFF));
+                        pixels.put((byte) (colour & 0xFF));
+                        pixels.put((byte) (background[i] ? 0 : 0xFF));
+                    }
                 }
                 pixels.flip();
 
                 int texture = glGenTextures();
                 glBindTexture(GL_TEXTURE_2D, texture);
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0,
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, croppedWidth, croppedHeight, 0,
                         GL_RGBA, GL_UNSIGNED_BYTE, pixels);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-                return texture;
+                return new SpriteTexture(texture, croppedWidth, croppedHeight);
             }
             finally
             {
@@ -215,13 +381,15 @@ final class GlUtil
         if (background[index])
             return;
 
-        int colour = argb[index];
-        int r = (colour >> 16) & 0xFF;
-        int g = (colour >> 8) & 0xFF;
-        int b = colour & 0xFF;
-
-        if (r < 8 && g < 8 && b < 8)
+        if (isBlack(argb[index]))
             queue.add(index);
+    }
+
+    private static boolean isBlack(int colour)
+    {
+        return ((colour >> 16) & 0xFF) < 8
+                && ((colour >> 8) & 0xFF) < 8
+                && (colour & 0xFF) < 8;
     }
 
     /** Writes a bottom-up RGBA buffer (as returned by glReadPixels) to a PNG. */

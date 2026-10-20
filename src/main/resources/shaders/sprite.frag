@@ -13,8 +13,8 @@ void main()
 {
     vec4 texel = texture(uSprite, vUV);
 
-    // The loader flood-fills the black background to alpha 0 and keeps
-    // interior black pixels (eyes, outlines).
+    // The loader already removed the black background (and one-pixel tips),
+    // so a plain alpha test is enough.
     if (texel.a < 0.5)
         discard;
 
@@ -22,3 +22,5 @@ void main()
     oDepth = vDepth;
     gl_FragDepth = clamp(vDepth / uFogDist, 0.0, 1.0);
 }
+
+
