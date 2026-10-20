@@ -85,6 +85,7 @@ public final class GpuMain implements ClientBridge.View
     private double exitAfterSeconds = -1.0;
     private double openChatAfterSeconds = -1.0;
     private boolean skipWindowDestroy = false;
+    private long suppressCharUntilNanos = 0L;
 
     public static void main(String[] args)
     {
@@ -318,6 +319,10 @@ public final class GpuMain implements ClientBridge.View
             {
                 chat.setOpen(true);
                 releaseMovementKeys();
+
+                // GLFW sends the character for this key after the key callback.
+                // Without this the 'T' that opened the chat is typed into it.
+                suppressCharUntilNanos = System.nanoTime() + 30_000_000L;
                 return;
             }
 
@@ -350,6 +355,12 @@ public final class GpuMain implements ClientBridge.View
 
         glfwSetCharCallback(window, (handle, codepoint) ->
         {
+            if (System.nanoTime() <= suppressCharUntilNanos)
+            {
+                suppressCharUntilNanos = 0L;
+                return;
+            }
+
             if (chat != null && chat.isOpen() && codepoint >= 32 && codepoint < 127)
                 chat.append((char) codepoint);
         });
