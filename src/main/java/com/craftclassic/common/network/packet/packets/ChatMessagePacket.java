@@ -53,6 +53,11 @@ public class ChatMessagePacket extends Packet
         if(player == null)
             return;
 
+        // Plugins see every line before the built-in commands do, so they can
+        // implement their own "/commands" by returning false.
+        if(!ConnectionManager.INSTANCE.allowChat(player, this.message))
+            return;
+
         // Slash commands are handled by the server, not broadcast.
         if(ConnectionManager.INSTANCE.handleCommand(player, this.message))
             return;

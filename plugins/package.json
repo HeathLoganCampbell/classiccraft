@@ -1,0 +1,13 @@
+{
+  "name": "classiccraft-plugins",
+  "private": true,
+  "description": "TypeScript build for ClassicCraft server plugins",
+  "scripts": {
+    "build": "esbuild wave/index.ts --outfile=wave/index.js --target=es2020",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

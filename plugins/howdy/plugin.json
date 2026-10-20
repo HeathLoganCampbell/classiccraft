@@ -1,0 +1,6 @@
+{
+  "name": "howdy",
+  "version": "1.0.0",
+  "description": "Says Howdy!! every 10 seconds",
+  "main": "index.js"
+}

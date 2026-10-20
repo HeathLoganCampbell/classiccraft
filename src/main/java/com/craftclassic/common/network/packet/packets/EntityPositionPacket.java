@@ -52,6 +52,18 @@ public class EntityPositionPacket extends Packet
 
         this.entityId = player.getEntityId();
 
+        double fromX = player.getLocation() != null ? player.getLocation().getX() : x;
+        double fromY = player.getLocation() != null ? player.getLocation().getY() : y;
+        double fromZ = player.getLocation() != null ? player.getLocation().getZ() : z;
+
+        if (player.getLocation() != null)
+        {
+            player.getLocation().setX((float) x);
+            player.getLocation().setY((float) y);
+            player.getLocation().setZ((float) z);
+        }
+
+        ConnectionManager.INSTANCE.fireMove(player, fromX, fromY, fromZ, x, y, z);
         ConnectionManager.INSTANCE.broadcastPacketBesidesSelf(player, this);
     }
 

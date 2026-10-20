@@ -96,9 +96,23 @@ overlay and networking are not ported to the GPU client yet.
 
 ## Server plugins
 
-`RetroCraftServer` registers `ServerPlugin`s and calls `onPlayerJoin(Player)` for each
-connection. The built-in `WelcomePlugin` sends `&bWelcome to the server` to the joining
-player. Add one by implementing `ServerPlugin` and registering it in `RetroCraftServer`.
+Server plugins are JavaScript, hosted in-process by GraalJS. Each plugin lives in its
+own folder under the top-level `plugins/` directory with a `plugin.json` manifest:
+
+```
+plugins/wave/
+├── plugin.json
+├── index.ts     # source (TypeScript is compiled ahead of time)
+└── index.js     # main
+```
+
+Drop in a folder and restart the server; no rebuild. Plugins can react to player
+join/disconnect, block break/place, movement, server ticks and chat, and can send
+chat through a small `server` API. TypeScript gets editor support from
+`plugins/classiccraft.d.ts` and is compiled to JavaScript with esbuild.
+
+See [plugins/README.md](plugins/README.md) for the manifest, the full event list and
+examples. The built-in Java `WelcomePlugin` still runs alongside script plugins.
 
 ## Tests
 
@@ -108,7 +122,8 @@ mvn test
 
 The suite is JUnit 5 and covers the shared simulation and network layers: world access
 and generation, the block registry and behaviour, raycasting, player physics and
-interaction, packet registry/round-trips/pipeline, and bitmap assets (102 tests).
+interaction, packet registry/round-trips/pipeline, bitmap assets, and the GraalJS
+plugin loader and events.
 
 The GPU renderer is checked separately with `./run-gpu.sh --selftest` (frame time and
 `gpu-frame.png`); `--chat-demo` and `--water-demo` render the overlay and shallow-water

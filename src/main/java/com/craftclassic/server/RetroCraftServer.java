@@ -1,6 +1,7 @@
 package com.craftclassic.server;
 
 import com.craftclassic.common.entities.Player;
+import com.craftclassic.common.events.ServerTickEvent;
 import com.craftclassic.common.network.ConnectionManager;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.pipeline.ServerNettyPipeline;
@@ -13,6 +14,7 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.locks.LockSupport;
@@ -20,6 +22,8 @@ import java.util.concurrent.locks.LockSupport;
 public class RetroCraftServer implements Runnable
 {
     public static final int PORT = 8256;
+
+    private final int port;
 
     /** Simulation rate. The loop is fixed-rate: rendering is not involved. */
     public static final int TICKS_PER_SECOND = 20;
@@ -33,8 +37,18 @@ public class RetroCraftServer implements Runnable
 
     public RetroCraftServer()
     {
+        this(Integer.getInteger("classiccraft.port", PORT));
+    }
+
+    public RetroCraftServer(int port)
+    {
+        this.port = port;
         this.plugins.register(new WelcomePlugin());
         ConnectionManager.INSTANCE.setCommandHandler(CommandManager::handle);
+        ConnectionManager.INSTANCE.setChatFilter(this.plugins::fireChat);
+        ConnectionManager.INSTANCE.addBreakBlockListener(this.plugins::firePlayerBreakBlock);
+        ConnectionManager.INSTANCE.addPlaceBlockListener(this.plugins::firePlayerPlaceBlock);
+        ConnectionManager.INSTANCE.addMoveListener(this.plugins::firePlayerMove);
     }
 
     public void start()
@@ -45,6 +59,14 @@ public class RetroCraftServer implements Runnable
     @Override
     public void run()
     {
+        Path pluginDirectory = Path.of(System.getProperty("classiccraft.plugins", "plugins"))
+                .toAbsolutePath()
+                .normalize();
+        int loaded = this.plugins.loadDirectory(pluginDirectory);
+
+        if (loaded > 0)
+            System.out.println("Plugins:  loaded " + loaded + " from " + pluginDirectory);
+
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -57,16 +79,18 @@ public class RetroCraftServer implements Runnable
 
             // Start the server.
             bootstrap
-                    .bind(PORT)
+                    .bind(this.port)
                     .addListener((ChannelFutureListener) future -> {
                         final Channel channel = future.channel();
                         if (future.isSuccess()) {
-                            System.out.println("Listening on " + channel.localAddress());
+                            System.out.println("Listening on " + channel.localAddress()
+                                    + " (plugins from " + pluginDirectory + ')');
                         }
                     })
                     .sync();
 
             ConnectionManager.INSTANCE.addJoinListener(this.plugins::firePlayerJoin);
+            ConnectionManager.INSTANCE.addDisconnectListener(this.plugins::firePlayerDisconnect);
 
             // Fixed-rate loop: the deadline advances by exactly one tick, so
             // processing time is subtracted from the sleep instead of being
@@ -100,6 +124,8 @@ public class RetroCraftServer implements Runnable
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
+            this.plugins.close();
+
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
@@ -128,6 +154,7 @@ public class RetroCraftServer implements Runnable
      */
     private void tick(long tick)
     {
+        this.plugins.fireServerTick(new ServerTickEvent(tick, TICKS_PER_SECOND));
     }
 
     private void flushPackets()

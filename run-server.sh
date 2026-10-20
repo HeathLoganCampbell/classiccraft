@@ -8,4 +8,7 @@ cd "$(dirname "$0")"
 
 mvn -q -DskipTests compile dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
 
-exec java -cp "target/classes:$(cat target/classpath.txt)" com.craftclassic.server.Main
+# GraalJS loads native Truffle support through System.load on modern JDKs.
+JVM_FLAGS=(--enable-native-access=ALL-UNNAMED)
+
+exec java "${JVM_FLAGS[@]}" -cp "target/classes:$(cat target/classpath.txt)" com.craftclassic.server.Main "$@"

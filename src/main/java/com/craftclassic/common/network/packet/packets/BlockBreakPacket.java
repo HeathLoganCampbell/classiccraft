@@ -1,5 +1,6 @@
 package com.craftclassic.common.network.packet.packets;
 
+import com.craftclassic.common.entities.Player;
 import com.craftclassic.common.network.ConnectionManager;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.player.PlayerConnection;
@@ -38,7 +39,12 @@ public class BlockBreakPacket extends Packet
     @Override
     public void process(PlayerConnection playerConnection)
     {
-        ConnectionManager.INSTANCE.broadcastPacketBesidesSelf(playerConnection.getPlayer(), this);
+        Player player = playerConnection.getPlayer();
+        if (player == null)
+            return;
+
+        ConnectionManager.INSTANCE.fireBreakBlock(player, this.x, this.y, this.z);
+        ConnectionManager.INSTANCE.broadcastPacketBesidesSelf(player, this);
     }
 
     public int getX() {

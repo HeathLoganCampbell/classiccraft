@@ -46,3 +46,4 @@ including the trade-offs that are now visible with hindsight.
 | [0024](0024-chat.md) | Chat over the existing packet pipeline | Accepted |
 | [0025](0025-transparent-animated-water.md) | Transparent, animated water | Accepted |
 | [0026](0026-server-plugin-hook.md) | Server plugin hook | Accepted |
+| [0027](0027-graalvm-javascript-plugins.md) | JavaScript server plugins with GraalJS | Accepted |

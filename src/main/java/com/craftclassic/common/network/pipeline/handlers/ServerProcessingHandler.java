@@ -19,6 +19,12 @@ public class ServerProcessingHandler extends SimpleChannelInboundHandler<Packet>
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx)
+    {
+        packetProcessor.removePlayerConnection(ctx);
+    }
+
+    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         if(!ctx.channel().isActive())
         {

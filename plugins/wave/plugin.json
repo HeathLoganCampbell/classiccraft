@@ -1,0 +1,6 @@
+{
+  "name": "wave",
+  "version": "1.0.0",
+  "description": "Greets players and adds a /wave command",
+  "main": "index.js"
+}

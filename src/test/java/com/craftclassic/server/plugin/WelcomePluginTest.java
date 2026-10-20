@@ -1,6 +1,8 @@
 package com.craftclassic.server.plugin;
 
 import com.craftclassic.common.entities.Player;
+import com.craftclassic.common.events.PlayerJoinEvent;
+import com.craftclassic.common.events.PlayerJoinEvent;
 import com.craftclassic.common.network.packet.packets.ChatMessagePacket;
 import com.craftclassic.common.network.player.PlayerConnection;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -20,7 +22,7 @@ class WelcomePluginTest
         Player player = new Player(connection, "Alice", 1);
         connection.setPlayer(player);
 
-        new WelcomePlugin().onPlayerJoin(player);
+        new WelcomePlugin().onPlayerJoin(new PlayerJoinEvent(player));
         channel.flush();
 
         Object outbound = channel.readOutbound();
@@ -40,7 +42,7 @@ class WelcomePluginTest
         manager.register(new ServerPlugin()
         {
             @Override
-            public void onPlayerJoin(Player player)
+            public void onPlayerJoin(PlayerJoinEvent event)
             {
                 fired[0] = true;
             }

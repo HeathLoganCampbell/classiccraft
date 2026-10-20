@@ -1,6 +1,6 @@
 package com.craftclassic.server.plugin;
 
-import com.craftclassic.common.entities.Player;
+import com.craftclassic.common.events.PlayerJoinEvent;
 import com.craftclassic.common.network.packet.packets.ChatMessagePacket;
 import com.craftclassic.common.network.player.PlayerConnection;
 
@@ -10,9 +10,9 @@ public final class WelcomePlugin implements ServerPlugin
     public static final String MESSAGE = "&bWelcome to the server";
 
     @Override
-    public void onPlayerJoin(Player player)
+    public void onPlayerJoin(PlayerJoinEvent event)
     {
-        PlayerConnection connection = player.getPlayerConnection();
+        PlayerConnection connection = event.getPlayer().getPlayerConnection();
         if (connection != null)
             connection.sendPacket(new ChatMessagePacket(MESSAGE));
     }
