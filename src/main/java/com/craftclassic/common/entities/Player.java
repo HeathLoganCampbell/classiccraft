@@ -170,7 +170,7 @@ public class Player extends LivingEntity
 						if (Input.getKey(KeyEvent.VK_SPACE))
 						{
 							Input.setKey(KeyEvent.VK_SPACE, false);
-							this.getVelocity().setY(-0.13f * GameSettings.tickScale);
+							this.getVelocity().setY(-0.1365f * GameSettings.tickScale);
 							this.setOnJump(true);
 							this.setJumpingTicks(0);
 							this.setOnGround(false);
