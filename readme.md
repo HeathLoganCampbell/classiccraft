@@ -20,6 +20,34 @@ right mouse button = place block
 right arrow key = changed block placed 
 ```
 
+## GPU renderer (experimental)
+
+The world renderer can also run on the GPU. It is the same raycaster, ported to
+a fragment shader: the 64x64x64 block array becomes a 256 KB `R8UI` 3D texture,
+`World.render()` becomes `shaders/raycast.frag`, and the result is still drawn
+at 318x200 and nearest-upscaled, so the look is unchanged.
+
+The CPU renderer is untouched and remains the reference implementation; this is
+an optional backend, not a replacement.
+
+```bash
+./run-gpu.sh                 # play, natural terrain
+./run-gpu.sh --flat          # the old flat world
+./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
+```
+
+Controls are the same as the CPU client. `Esc` quits, `F2` toggles the debug
+window title, left/right arrows cycle the block type (and turn, matching the
+old key handling).
+
+Requires LWJGL 3 and a GPU with OpenGL 3.3+; on macOS the script passes
+`-XstartOnFirstThread`. Measured on an M1 Pro through Metal-backed OpenGL 4.1:
+**0.36-0.52 ms/frame** at 318x200 (~2,000-2,700 fps serialised), with the
+simulation at 0.14 ms/tick. See [ADR 0016](docs/adr/0016-gpu-raycast-backend.md).
+
+Not ported yet: player sprites (the depth attachment is ready), the debug
+overlay, and networking.
+
 ## Development
 
 ### Things to add
