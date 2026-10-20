@@ -103,7 +103,9 @@ public class Player extends LivingEntity
 
 		float xVel = sinYaw * accZ + cosYaw * accX;
 		float zVel = cosYaw * accZ - sinYaw * accX;
-		float yVel = 0.004f * GameSettings.tickScale;
+		// 1.6x the original 0.004: the old value gave a 1.67-block, 1.05 s jump,
+		// which read as floaty. This lands nearer 1.1 blocks / 0.6 s.
+		float yVel = 0.0065f * GameSettings.tickScale;
 
 		this.getVelocity().add(new Vector(xVel, yVel, zVel));
 
