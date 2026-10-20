@@ -12,10 +12,19 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.locks.LockSupport;
 
 public class RetroCraftServer implements Runnable
 {
     public static final int PORT = 8256;
+
+    /** Simulation rate. The loop is fixed-rate: rendering is not involved. */
+    public static final int TICKS_PER_SECOND = 20;
+
+    private static final long TICK_NANOS = 1_000_000_000L / TICKS_PER_SECOND;
+
+    /** Drop the backlog instead of replaying a burst after a long stall. */
+    private static final long MAX_BACKLOG_NANOS = TICK_NANOS * 5;
 
     public void start()
     {
@@ -46,39 +55,73 @@ public class RetroCraftServer implements Runnable
                     })
                     .sync();
 
-            while(true)
+            // Fixed-rate loop: the deadline advances by exactly one tick, so
+            // processing time is subtracted from the sleep instead of being
+            // added to the period. Sleep(50) after the work ran at ~19.9 TPS
+            // and drifted further with every handler that took longer.
+            long nextTick = System.nanoTime();
+            long tick = 0;
+
+            while(!Thread.currentThread().isInterrupted())
             {
-                // process in packets
-                for (Map.Entry<PlayerConnection, Player> entry : ConnectionManager.INSTANCE.getConnectedPlayers().entrySet())
+                processPackets();
+                tick(tick++);
+                flushPackets();
+
+                nextTick += TICK_NANOS;
+
+                long now = System.nanoTime();
+
+                if(nextTick > now)
                 {
-                    PlayerConnection playerConnection = entry.getKey();
-                    Queue<Packet> recievedPackets = playerConnection.getRecievedPackets();
-                    Packet packet;
-                    while((packet = recievedPackets.poll()) != null)
-                    {
-                        packet.process(playerConnection);
-                    }
+                    // parkNanos, not sleep: no checked exception, and it keeps
+                    // the interrupt flag set so the loop exits cleanly.
+                    LockSupport.parkNanos(nextTick - now);
                 }
-
-                // Do stuff
-
-
-                // send out packets
-                for (Map.Entry<PlayerConnection, Player> entry : ConnectionManager.INSTANCE.getConnectedPlayers().entrySet())
+                else if(now - nextTick > MAX_BACKLOG_NANOS)
                 {
-                    PlayerConnection playerConnection = entry.getKey();
-                    playerConnection.flush();
+                    nextTick = now;
                 }
-
-                Thread.sleep(50);
             }
             // Wait until the server socket is closed.
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
         } finally {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
+        }
+    }
+
+    private void processPackets()
+    {
+        for (Map.Entry<PlayerConnection, Player> entry : ConnectionManager.INSTANCE.getConnectedPlayers().entrySet())
+        {
+            PlayerConnection playerConnection = entry.getKey();
+            Queue<Packet> recievedPackets = playerConnection.getRecievedPackets();
+            Packet packet;
+
+            while((packet = recievedPackets.poll()) != null)
+            {
+                packet.process(playerConnection);
+            }
+        }
+    }
+
+    /**
+     * One simulation step. The server does not own a World yet, so this is
+     * where world/entity ticking will go; packet-driven state changes happen
+     * in {@link #processPackets()}.
+     */
+    private void tick(long tick)
+    {
+    }
+
+    private void flushPackets()
+    {
+        for (Map.Entry<PlayerConnection, Player> entry : ConnectionManager.INSTANCE.getConnectedPlayers().entrySet())
+        {
+            entry.getKey().flush();
         }
     }
 }
