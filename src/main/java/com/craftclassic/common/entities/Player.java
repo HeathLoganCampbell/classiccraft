@@ -74,13 +74,13 @@ public class Player extends LivingEntity
 		{
 			Block block = getWorld().getBlock(this.getTargetBlockPlace());
 
-			if(block.onPlace(new PlaceEvent(this.getTargetBlockPlace()))) {
+			if(!blockIntersectsPlayer(this.getTargetBlockPlace())
+					&& block.onPlace(new PlaceEvent(this.getTargetBlockPlace()))) {
 				BlockPlacePacket blockPlacePacket = new BlockPlacePacket((int) this.getTargetBlockPlace().getX(),
 																		 (int) this.getTargetBlockPlace().getY(),
 																		 (int) this.getTargetBlockPlace().getZ(),
 						GameSettings.placeBlockTypeId);
 				getWorld().setBlock(this.getTargetBlockPlace(), Block.getBlockById(GameSettings.placeBlockTypeId));
-				liftOutOfPlacedBlock(this.getTargetBlockPlace());
 				if (packetSink != null) packetSink.accept(blockPlacePacket);
 			}
 			Input.setMouse(MouseEvent.BUTTON3, false);
@@ -224,29 +224,35 @@ public class Player extends LivingEntity
 	}
 
 	/**
-	 * Placing a block in the cell the player occupies used to leave them stuck
-	 * inside it, which also stopped the next jump. If the new block overlaps
-	 * the body, step the player up one block so they stand on it instead
-	 * (placing under yourself while jumping is already clear of the body).
+	 * True when a block in this cell would overlap the player's collision box.
+	 * The box matches Player.tick's collision sample offsets: 0.6 wide and
+	 * 1.6 tall, from 0.15 above the origin to 1.45 below it (y grows down).
+	 * Placement inside it is refused, which is what stops blocks appearing in
+	 * the player and what makes "place under me" require a jump.
 	 */
-	private void liftOutOfPlacedBlock(Location placed)
+	private boolean blockIntersectsPlayer(Location block)
 	{
 		Location location = this.getLocation();
 
-		int bodyX = (int) Math.floor(location.getX()) - 64;
-		int bodyY = (int) Math.floor(location.getY()) - 64;
-		int bodyZ = (int) Math.floor(location.getZ()) - 64;
+		final float halfWidth = 0.3f;
+		final float top = 0.15f;
+		final float bottom = 1.45f;
 
-		boolean overlapsBody = placed.getX() == bodyX
-				&& placed.getZ() == bodyZ
-				&& (placed.getY() == bodyY || placed.getY() == bodyY + 1);
+		float minX = location.getX() - halfWidth;
+		float maxX = location.getX() + halfWidth;
+		float minY = location.getY() - top;
+		float maxY = location.getY() + bottom;
+		float minZ = location.getZ() - halfWidth;
+		float maxZ = location.getZ() + halfWidth;
 
-		if(!overlapsBody)
-			return;
+		// World block coordinates are camera coordinates minus 64.
+		float blockMinX = block.getX() + 64.0f;
+		float blockMinY = block.getY() + 64.0f;
+		float blockMinZ = block.getZ() + 64.0f;
 
-		location.setY(location.getY() - 1.0f);   // y grows downwards
-		this.getVelocity().setY(0.0f);
-		this.setOnGround(false);
+		return maxX > blockMinX && minX < blockMinX + 1.0f
+				&& maxY > blockMinY && minY < blockMinY + 1.0f
+				&& maxZ > blockMinZ && minZ < blockMinZ + 1.0f;
 	}
 
 	public Location getTargetBlockPlace() {
