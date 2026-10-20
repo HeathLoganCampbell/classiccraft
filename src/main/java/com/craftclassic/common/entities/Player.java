@@ -98,11 +98,12 @@ public class Player extends LivingEntity
 			speed = 0.03f * GameSettings.tickScale * GameSettings.speedMultiplier;
 		}
 
-		// Air control is deliberately weak: you keep the momentum you took off
-		// with, but you cannot build speed or turn freely in the air.
+		// Air control is deliberately weak: you keep most of your takeoff
+		// momentum and can nudge a landing, but you cannot turn or accelerate
+		// like you can on the ground (5% of ground acceleration).
 		if(!onGround)
 		{
-			speed *= 0.03f;
+			speed *= 0.05f;
 		}
 
 		float accX = (float)((Input.getKey(KeyEvent.VK_D) ? 1 : 0) - (Input.getKey(KeyEvent.VK_A) ? 1 : 0)) * speed;
