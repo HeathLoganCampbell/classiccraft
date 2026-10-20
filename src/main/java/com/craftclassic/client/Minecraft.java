@@ -5,6 +5,7 @@ import com.craftclassic.client.input.Input;
 import com.craftclassic.client.net.NettyClient;
 import com.craftclassic.client.overlay.CrossHair;
 import com.craftclassic.client.overlay.InfoOverlay;
+import com.craftclassic.common.GameSettings;
 import com.craftclassic.common.entities.Player;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.packet.packets.EntityPositionPacket;
@@ -37,7 +38,6 @@ public class Minecraft extends Applet implements Runnable {
     private List<Runnable> nextTickRunnables;
     private List<Runnable> nextTickRunnablesWater;
     
-    private static int placeBlockTypeId = 1;
 
     public static int FRAMES_PER_SECOND = 0;
 
@@ -78,6 +78,8 @@ public class Minecraft extends Applet implements Runnable {
         this.screen = new Screen(width, height);
         this.crossHair = new CrossHair(this.screen);
         this.infoOverlay = new InfoOverlay(this, this.screen);
+
+        Player.packetSink = this::sendPacket;
 
         INSTANCE = this;
     }
@@ -178,15 +180,16 @@ public class Minecraft extends Applet implements Runnable {
     }
 
 	public static int getPlaceBlockTypeId() {
-		return placeBlockTypeId;
+		return GameSettings.placeBlockTypeId;
 	}
 
 	public static void setPlaceBlockTypeId(int localPlaceBlockTypeId) {
-		placeBlockTypeId = localPlaceBlockTypeId;
+		GameSettings.placeBlockTypeId = localPlaceBlockTypeId;
 	}
 
     public void sendPacket(Packet packet)
     {
-        this.nettyClient.sendPacket(packet);
+        if (this.nettyClient != null)
+            this.nettyClient.sendPacket(packet);
     }
 }

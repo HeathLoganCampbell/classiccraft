@@ -1,10 +1,11 @@
 package com.craftclassic.common.entities;
 
-import com.craftclassic.client.Minecraft;
 import com.craftclassic.client.input.Input;
+import com.craftclassic.common.GameSettings;
 import com.craftclassic.common.blocks.Block;
 import com.craftclassic.common.events.BreakEvent;
 import com.craftclassic.common.events.PlaceEvent;
+import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.packet.packets.BlockPlacePacket;
 import com.craftclassic.common.network.player.PlayerConnection;
 import com.craftclassic.common.utils.Location;
@@ -12,6 +13,7 @@ import com.craftclassic.common.utils.Vector;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.util.function.Consumer;
 
 public class Player extends LivingEntity
 {
@@ -24,6 +26,12 @@ public class Player extends LivingEntity
 	private PlayerConnection playerConnection;
 
 	private boolean sprinting = false;
+
+	/**
+	 * Installed by whichever client is running; the simulation never talks to
+	 * the network stack or to the applet shell directly.
+	 */
+	public static Consumer<Packet> packetSink;
 
 	public Player(PlayerConnection playerConnection, String name, int id)
 	{
@@ -55,7 +63,7 @@ public class Player extends LivingEntity
 						(int) this.getTargetBlock().getZ(),
 						Block.AIR.getId());
 				getWorld().setBlock(this.getTargetBlock(), Block.AIR);
-				Minecraft.INSTANCE.sendPacket(blockPlacePacket);
+				if (packetSink != null) packetSink.accept(blockPlacePacket);
 			}
 			Input.setMouse(MouseEvent.BUTTON1, false);
 		}
@@ -70,9 +78,9 @@ public class Player extends LivingEntity
 				BlockPlacePacket blockPlacePacket = new BlockPlacePacket((int) this.getTargetBlockPlace().getX(),
 																		 (int) this.getTargetBlockPlace().getY(),
 																		 (int) this.getTargetBlockPlace().getZ(),
-						Minecraft.getPlaceBlockTypeId());
-				getWorld().setBlock(this.getTargetBlockPlace(), Block.getBlockById(Minecraft.getPlaceBlockTypeId()));
-				Minecraft.INSTANCE.sendPacket(blockPlacePacket);
+						GameSettings.placeBlockTypeId);
+				getWorld().setBlock(this.getTargetBlockPlace(), Block.getBlockById(GameSettings.placeBlockTypeId));
+				if (packetSink != null) packetSink.accept(blockPlacePacket);
 			}
 			Input.setMouse(MouseEvent.BUTTON3, false);
 		}

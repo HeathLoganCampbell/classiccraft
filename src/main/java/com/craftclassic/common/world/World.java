@@ -7,6 +7,7 @@ import com.craftclassic.common.blocks.Block;
 import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.utils.Location;
 import com.craftclassic.common.world.types.FlatWorldType;
+import com.craftclassic.common.world.types.NaturalWorldType;
 import com.craftclassic.common.world.types.WorldType;
 
 import java.util.ArrayList;
@@ -18,6 +19,12 @@ public class World implements IWorld
 {
 	Random random = new Random();
 	public Block[] blockData = new Block[262144];
+
+	/**
+	 * Incremented on every block change so out-of-process views of the world
+	 * (the GPU backend's 3D texture) know when they need re-uploading.
+	 */
+	public long blockVersion = 0;
 
 	private int width, height, depth;
 	private long seed;
@@ -47,6 +54,21 @@ public class World implements IWorld
 		init();
 	}
 
+	/**
+	 * Headless world with no {@link Minecraft} host, for renderers that drive the
+	 * world themselves (see the GPU backend in {@code client.gpu}).
+	 */
+	public World(int width, int depth, int height, long seed, boolean naturalTerrain)
+	{
+		this(null, width, depth, height, seed);
+
+		if(naturalTerrain)
+		{
+			this.worldType = new NaturalWorldType(this);
+			init();
+		}
+	}
+
 	public void init() {
 		random.setSeed(seed);
 
@@ -66,6 +88,7 @@ public class World implements IWorld
 	public void setBlock(int x, int y, int z, Block block)
 	{
 		this.blockData[x + y * 64 + z * 4096] = block;
+		this.blockVersion++;
 	}
 	
 	public void setBlock(Location location, Block block)
@@ -74,7 +97,10 @@ public class World implements IWorld
 		if(location.getX() >= 0 && location.getX() <= this.width
 				&& location.getY() >= 0 && location.getY() <= this.height
 				&& index > 0 && index < this.blockData.length)
+		{
 			this.blockData[index] = block;
+			this.blockVersion++;
+		}
 	}
 	
 	public int getWidth() {
@@ -137,14 +163,21 @@ public class World implements IWorld
 			entity.tick();
 		}
 
-		for (int y = 0; y < this.getHeight(); ++y)
+		// Only blocks that actually simulate (liquids, sand, TNT) need a Location
+		// allocated and a virtual call. The old version did both for all 262,144
+		// positions every tick, which made the tick - not the renderer - the
+		// dominant cost once rendering moved off the CPU.
+		for (int y = 0; y < this.height; ++y)
 		{
-			for (int z = 0; z < this.getWidth(); ++z)
+			for (int z = 0; z < this.depth; ++z)
 			{
-				for (int x = 0; x < this.getHeight(); ++x)
+				for (int x = 0; x < this.width; ++x)
 				{
-					Location location = new Location(this, x, y, z);
-					location.getBlock().onTick(new Location(this, x, y, z));
+					Block block = this.blockData[x + y * 64 + z * 4096];
+					if(block == null || block == Block.AIR || !block.isPhysics())
+						continue;
+
+					block.onTick(new Location(this, x, y, z));
 				}
 			}
 		}
@@ -162,11 +195,6 @@ public class World implements IWorld
 
 		int textureX = 0;
 		int textureY = 0;
-
-		int skyboxColour = 0xA7C9EB;
-		int maxSkyboxColour = 255;
-
-		double fogOfWar = 50.0;//render distance
 
 		Location playerLoc = this.minecraft.player.getLocation();
 		float sinYaw = (float)Math.sin(playerLoc.getYaw() * 100f);
@@ -194,6 +222,13 @@ public class World implements IWorld
 			//number of lines to render, horzontial
 			for(int screenY = 0; screenY < pixelHeight; screenY++)
 			{
+				// These are per pixel state. They used to live outside both loops,
+				// which meant the first ray that hit a block shrank the render
+				// distance - and set the sky colour - for the rest of the frame.
+				int skyboxColour = 0xA7C9EB;
+				int maxSkyboxColour = 255;
+				double fogOfWar = 50.0; // render distance
+
 				float hpixelLoc = (float)(screenY - pixelHalfHeight) / 90.0f;
 
 				//rotation matrix
