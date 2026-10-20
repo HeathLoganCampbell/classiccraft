@@ -6,21 +6,12 @@ in float vDepth;
 layout(location = 0) out vec4  oColor;
 layout(location = 1) out float oDepth;
 
-uniform sampler2D uSprite;
+uniform vec4  uColor;
 uniform float uFogDist;
 
 void main()
 {
-    vec4 texel = texture(uSprite, vUV);
-
-    // The loader already removed the black background (and one-pixel tips),
-    // so a plain alpha test is enough.
-    if (texel.a < 0.5)
-        discard;
-
-    oColor = vec4(texel.rgb, 1.0);
+    oColor = uColor;
     oDepth = vDepth;
     gl_FragDepth = clamp(vDepth / uFogDist, 0.0, 1.0);
 }
-
-

@@ -1,6 +1,5 @@
 package com.craftclassic.client.gpu;
 
-import com.craftclassic.client.Main;
 import com.craftclassic.common.entities.Entity;
 import com.craftclassic.common.world.World;
 
@@ -14,10 +13,10 @@ import static org.lwjgl.opengl.GL30.*;
 /**
  * Remote-player billboards.
  *
- * <p>Each sprite is a world-space quad built from the camera's right/up basis.
- * All four corners are projected, so the rasteriser does the perspective
- * correction; the texture is upright and unmirrored. Depth comes from the
- * raycast's {@code gl_FragDepth}, so players are hidden behind terrain.</p>
+ * <p>Each player is a world-space rectangle built from the camera's right/up
+ * basis. All four corners are projected, so the rasteriser does the
+ * perspective correction. Depth comes from the raycast's
+ * {@code gl_FragDepth}, so players are hidden behind terrain.</p>
  */
 public final class SpriteRenderer implements AutoCloseable
 {
@@ -29,10 +28,8 @@ public final class SpriteRenderer implements AutoCloseable
     private final int program;
     private final int vao;
     private final int vbo;
-    private final int texture;
-    private final int textureWidth;
-    private final int textureHeight;
 
+    private final int uColor;
     private final int uCenter;
     private final int uSize;
     private final int uRight;
@@ -42,7 +39,6 @@ public final class SpriteRenderer implements AutoCloseable
     private final int uPitch;
     private final int uFocal;
     private final int uResolution;
-    private final int uSprite;
     private final int uFogDist;
 
     public SpriteRenderer()
@@ -58,13 +54,8 @@ public final class SpriteRenderer implements AutoCloseable
         this.uPitch = uniform("uPitch");
         this.uFocal = uniform("uFocal");
         this.uResolution = uniform("uResolution");
-        this.uSprite = uniform("uSprite");
         this.uFogDist = uniform("uFogDist");
-
-        GlUtil.SpriteTexture sprite = GlUtil.playerSpriteTexture("player.png");
-        this.texture = sprite.id;
-        this.textureWidth = sprite.width;
-        this.textureHeight = sprite.height;
+        this.uColor = uniform("uColor");
 
         // aPos: x = left..right, y = top..bottom
         float[] quad =
@@ -110,11 +101,9 @@ public final class SpriteRenderer implements AutoCloseable
 
         double cy = Math.cos(scaledYaw);
         double sy = Math.sin(scaledYaw);
-        // The texture is cropped to the opaque sprite, so its pixel size is
-        // the visible sprite size. Convert the original pixel scale to world
-        // units at the focal distance.
-        float worldWidth = this.textureWidth * 4.0f * Main.RESOLUTION_SCALE / focal;
-        float worldHeight = this.textureHeight * 4.0f * Main.RESOLUTION_SCALE / focal;
+        // Player-sized rectangle: 0.6 wide, 1.8 tall, in world units.
+        float worldWidth = 0.6f;
+        float worldHeight = 1.8f;
 
         glUseProgram(program);
 
@@ -131,9 +120,10 @@ public final class SpriteRenderer implements AutoCloseable
         glUniform3f(uRight, (float) cy, 0.0f, (float) -sy);
         glUniform3f(uUp, 0.0f, -1.0f, 0.0f);
 
-        GlUtil.bindTexture(0, texture, GL_TEXTURE_2D);
-        glUniform1i(uSprite, 0);
+        glUniform4f(uColor, 0.86f, 0.86f, 0.86f, 1.0f);
 
+        // Players are drawn over the world: a billboard clipped by a block
+        // corner reads as a triangular chunk taken out of the model.
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(true);
@@ -147,25 +137,24 @@ public final class SpriteRenderer implements AutoCloseable
             if (entity.getEntityId() == 0 || entity.getLocation() == null)
                 continue;
 
-            // Anchor the bottom of the quad at the player's feet.
+            // Anchor the bottom of the rectangle at the player's feet.
             glUniform3f(uCenter,
                     entity.getLocation().getX(),
                     entity.getLocation().getY() + FEET_OFFSET - worldHeight * 0.5f,
                     entity.getLocation().getZ());
             glUniform2f(uSize, worldWidth, worldHeight);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         }
 
         glBindVertexArray(0);
         glDisable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
+        glDepthMask(true);
     }
 
     @Override
     public void close()
     {
         glDeleteProgram(program);
-        glDeleteTextures(texture);
         glDeleteBuffers(vbo);
         glDeleteVertexArrays(vao);
     }
