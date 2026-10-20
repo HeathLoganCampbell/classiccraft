@@ -13,8 +13,9 @@ void main()
 {
     vec4 texel = texture(uSprite, vUV);
 
-    // player.png has no alpha channel; black is the sprite background.
-    if (texel.r < 0.004 && texel.g < 0.004 && texel.b < 0.004)
+    // The loader flood-fills the black background to alpha 0 and keeps
+    // interior black pixels (eyes, outlines).
+    if (texel.a < 0.5)
         discard;
 
     oColor = vec4(texel.rgb, 1.0);

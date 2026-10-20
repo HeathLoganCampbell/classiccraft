@@ -178,7 +178,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uSpriteTexture = uniform(spriteProgram, "uSprite");
         this.uSpriteZ = uniform(spriteProgram, "uZ");
         this.uSpriteFog = uniform(spriteProgram, "uFogDist");
-        this.spriteTexture = GlUtil.texture2D("player.png", false);
+        this.spriteTexture = GlUtil.playerSpriteTexture("player.png");
 
         float[] quad =
         {
