@@ -89,6 +89,8 @@ public class Player extends LivingEntity
 		float sinYaw = (float)Math.sin(playerLoc.getYaw() * 100f);
 		float cosYaw = (float)Math.cos(playerLoc.getYaw() * 100f);
 
+		boolean onGround = this.isOnGround();
+
 		float speed = 0.02f * GameSettings.tickScale * GameSettings.speedMultiplier;
 
 		if(sprinting)
@@ -96,10 +98,18 @@ public class Player extends LivingEntity
 			speed = 0.03f * GameSettings.tickScale * GameSettings.speedMultiplier;
 		}
 
+		// Air control is deliberately weak: you keep the momentum you took off
+		// with, but you cannot build speed or turn freely in the air.
+		if(!onGround)
+		{
+			speed *= 0.03f;
+		}
+
 		float accX = (float)((Input.getKey(KeyEvent.VK_D) ? 1 : 0) - (Input.getKey(KeyEvent.VK_A) ? 1 : 0)) * speed;
 		float accZ = (float)((Input.getKey(KeyEvent.VK_W) ? 1 : 0) - (Input.getKey(KeyEvent.VK_S) ? 1 : 0)) * speed;
 
-		this.getVelocity().scalar(0.5f, 0.99f, 0.5f);
+		float horizontalDrag = onGround ? 0.5f : 0.98f;
+		this.getVelocity().scalar(horizontalDrag, 0.99f, horizontalDrag);
 
 		float xVel = sinYaw * accZ + cosYaw * accX;
 		float zVel = cosYaw * accZ - sinYaw * accX;
@@ -196,7 +206,9 @@ public class Player extends LivingEntity
 					this.setOnJump(false);
 				}
 
-				this.setOnGround(true);
+				// Do not re-ground on the tick the jump was initiated: that
+				// gave the next tick a full ground-acceleration burst in mid-air.
+				if(!this.isOnJump()) this.setOnGround(true);
 				if(this.isOnJump()) this.incrementJumpingTicks();
 				if(!this.isOnJump() && this.isOnGround()) this.getVelocity().setY(0.0f);
 			}
