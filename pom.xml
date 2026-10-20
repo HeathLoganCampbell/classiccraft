@@ -7,7 +7,7 @@
     <groupId>org.example</groupId>
     <artifactId>classiccraft</artifactId>
     <name>ClassicCraft</name>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
 
     <dependencies>
         <dependency>

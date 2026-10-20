@@ -44,7 +44,7 @@ public class InfoOverlay
         Player player = this.minecraft.player;
         Location location = player.getLocation();
 
-        this.screen.renderString("V0.4.5", 0, 0);
+        this.screen.renderString("V1.0", 0, 0);
         this.screen.renderString(Block.getBlockById(Minecraft.getPlaceBlockTypeId()).getName(), 0, 7);
         this.screen.renderString("X: " + location.getX(), 0, 14);
         this.screen.renderString("Y: " + location.getY(), 0, 21);

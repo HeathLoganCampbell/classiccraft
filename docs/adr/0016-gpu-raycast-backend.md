@@ -24,6 +24,10 @@ Two things made a GPU path worth trying:
 - the block atlas is already a 16x768 strip of 16x48 slots, which is exactly
   what `texelFetch` wants.
 
+ClassicCraft also drops Retro Craft's project-wide "no libraries" rule (see the
+README): the CPU renderer stays dependency-free, but rendering work may use a
+graphics library. That makes a GPU backend an option rather than a rewrite.
+
 ## Decision
 
 We add an **optional** GPU backend and keep the CPU renderer as the reference
@@ -42,7 +46,10 @@ implementation.
 - The world renders into a 318x200 RGBA8 target and is nearest-upscaled to the
   window (`shaders/blit.frag`), which also draws the crosshair. The pixelated
   look is preserved; resolution is now a choice rather than a budget.
-- The simulation stays at 200 ticks/second, decoupled from the refresh rate.
+- The simulation runs at a fixed 60 ticks/second (the rate the old
+  frame-bound loop averaged), decoupled from the refresh rate. `--tps` changes
+  the rate and `--speed` scales movement; `Player.tick` compensates motion for
+  the tick rate so changing `--tps` does not change how fast the player walks.
   `World.tick()` now skips non-physics blocks instead of allocating two
   `Location` objects for all 262,144 positions every tick.
 
@@ -91,8 +98,9 @@ pixel in both backends.
 
 - The GPU path needs LWJGL and a GLFW window. It does not run as an applet and
   cannot share the Swing shell; macOS also requires `-XstartOnFirstThread`.
-- The "no libraries" claim now applies to the CPU build only. This is a
-  deliberate, opt-in exception rather than a rewrite.
+- The project-wide "no libraries" claim is gone: ClassicCraft allows graphics
+  libraries. The CPU renderer remains dependency-free, so Retro Craft's original
+  learning constraint survives where it is actually load-bearing.
 - Sprites, the debug overlay and networking are not ported yet. The depth
   attachment is in place for sprite depth testing.
 - Two renderers means two things to keep in sync; the shader is the copy that

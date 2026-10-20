@@ -2,17 +2,36 @@
 A voxel game with an 80's look. The world is rendered by a per-pixel CPU raycaster,
 with an optional fragment-shader GPU backend.
 
-ClassicCraft is a standalone fork of
-[Retro Craft](https://github.com/HeathLoganCampbell/Retro-Craft). The original used no
-libraries beyond the JDK; the GPU backend is an opt-in exception.
+## Relationship to Retro Craft
+
+ClassicCraft is a fork of [Retro Craft](https://github.com/HeathLoganCampbell/Retro-Craft).
+
+Retro Craft's defining constraint was **no libraries**: the renderer is hand-written on
+the CPU and the only dependency is the JDK (see
+[ADR 0002](docs/adr/0002-pure-java-software-renderer.md)). ClassicCraft keeps that
+constraint for the CPU renderer, because that code is the explanation of how rendering
+works, but it does **not** apply it to the project as a whole.
+
+**Graphics libraries are allowed here.** The optional GPU backend uses LWJGL 3
+(GLFW + OpenGL), and future rendering work is free to use whatever library fits. The CPU
+path stays dependency-free and is kept as the reference implementation.
 
 [![Youtube video of Retro Craft](https://img.youtube.com/vi/m63pDKehByg/0.jpg)](https://www.youtube.com/watch?v=m63pDKehByg)
 
 [Youtube video of Retro Craft](https://www.youtube.com/watch?v=m63pDKehByg)
 
 ## How to install
-Just go to releases and download the jar
-[OR CLICK HERE TO DOWNLOAD THE JAR](https://github.com/HeathLoganCampbell/Retro-Craft/releases/download/v0.4.5/MincraftClassic.jar)
+Build from source (Java 18+ and Maven):
+
+```bash
+mvn package
+./run-gpu.sh          # GPU renderer; Maven pulls in LWJGL
+```
+
+ClassicCraft v1.0 is source-only for now. The last Retro Craft binary (v0.4.5, CPU
+renderer) is still on the
+[Retro Craft releases page](https://github.com/HeathLoganCampbell/Retro-Craft/releases).
+
 ## How to play
 ```
 W = forwards
@@ -24,7 +43,7 @@ right mouse button = place block
 right arrow key = changed block placed 
 ```
 
-## GPU renderer (experimental)
+## GPU renderer (v1.0)
 
 The world renderer can also run on the GPU. It is the same raycaster, ported to
 a fragment shader: the 64x64x64 block array becomes a 256 KB `R8UI` 3D texture,
@@ -37,6 +56,8 @@ an optional backend, not a replacement.
 ```bash
 ./run-gpu.sh                 # play, natural terrain
 ./run-gpu.sh --flat          # the old flat world
+./run-gpu.sh --tps 120       # simulation rate (default 60, independent of fps)
+./run-gpu.sh --speed 1.5     # movement multiplier
 ./run-gpu.sh --selftest 120  # render offscreen, write gpu-frame.png, print timings
 ```
 
@@ -46,11 +67,14 @@ old key handling).
 
 Requires LWJGL 3 and a GPU with OpenGL 3.3+; on macOS the script passes
 `-XstartOnFirstThread`. Measured on an M1 Pro through Metal-backed OpenGL 4.1:
-**0.36-0.52 ms/frame** at 318x200 (~2,000-2,700 fps serialised), with the
-simulation at 0.14 ms/tick. See [ADR 0016](docs/adr/0016-gpu-raycast-backend.md).
+**0.36-0.52 ms/frame** at 318x200 (~2,000-2,700 fps serialised).
 
-Not ported yet: player sprites (the depth attachment is ready), the debug
-overlay, and networking.
+The simulation runs at a fixed **60 ticks/second**, decoupled from the display, and
+movement is compensated for the tick rate so `--tps` changes smoothness, not speed.
+`--speed` changes speed. See [ADR 0016](docs/adr/0016-gpu-raycast-backend.md).
+
+Known limitations in v1.0: player sprites (the depth attachment is ready), the debug
+overlay and networking are not ported to the GPU client yet.
 
 ## Development
 
@@ -109,3 +133,11 @@ Because it sounded better
 * Add Multiplayer abilities
 * remove mouse control
 * Move project to use Maven
+
+### v1.0: ClassicCraft [20/10/2026]
+* Forked from Retro Craft and renamed ClassicCraft
+* Graphics libraries are allowed: the optional GPU backend uses LWJGL 3 + OpenGL
+* The world raycaster runs as a fragment shader, at 0.36-0.52 ms/frame (318x200)
+* Simulation runs at a fixed 60 ticks/s, decoupled from the frame rate (`--tps`, `--speed`)
+* Fixed the CPU renderer's per-frame fog/sky leak
+* World tick no longer allocates for all 262,144 blocks every tick
