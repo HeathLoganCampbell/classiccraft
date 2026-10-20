@@ -88,6 +88,12 @@ movement is compensated for the tick rate so `--tps` changes smoothness, not spe
 Known limitations in v1.0: player sprites (the depth attachment is ready), the debug
 overlay and networking are not ported to the GPU client yet.
 
+## Server plugins
+
+`RetroCraftServer` registers `ServerPlugin`s and calls `onPlayerJoin(Player)` for each
+connection. The built-in `WelcomePlugin` sends `&bWelcome to the server` to the joining
+player. Add one by implementing `ServerPlugin` and registering it in `RetroCraftServer`.
+
 ## Tests
 
 ```bash

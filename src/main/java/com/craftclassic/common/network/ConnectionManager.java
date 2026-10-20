@@ -7,14 +7,18 @@ import com.craftclassic.common.network.player.PlayerConnection;
 import com.craftclassic.common.utils.Location;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 public class ConnectionManager
 {
     public static ConnectionManager INSTANCE = new ConnectionManager();
 
     private final Map<PlayerConnection, Player> connectionPlayerMap = new ConcurrentHashMap<>();
+    private final List<Consumer<Player>> joinListeners = new CopyOnWriteArrayList<>();
 
     public void startPlayer(PlayerConnection playerConnection, String username)
     {
@@ -36,6 +40,14 @@ public class ConnectionManager
                 playerConnection.sendPacket(new EntitySpawnPacket(otherPlayer.getEntityId(), otherPlayer.getLocation()));
             }
         });
+
+        for (Consumer<Player> listener : this.joinListeners)
+            listener.accept(player);
+    }
+
+    public void addJoinListener(Consumer<Player> listener)
+    {
+        this.joinListeners.add(listener);
     }
 
     public Map<PlayerConnection, Player> getConnectedPlayers()

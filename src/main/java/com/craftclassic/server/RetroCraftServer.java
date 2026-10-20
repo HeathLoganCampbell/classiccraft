@@ -5,6 +5,8 @@ import com.craftclassic.common.network.ConnectionManager;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.pipeline.ServerNettyPipeline;
 import com.craftclassic.common.network.player.PlayerConnection;
+import com.craftclassic.server.plugin.PluginManager;
+import com.craftclassic.server.plugin.WelcomePlugin;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -21,10 +23,17 @@ public class RetroCraftServer implements Runnable
     /** Simulation rate. The loop is fixed-rate: rendering is not involved. */
     public static final int TICKS_PER_SECOND = 20;
 
+    private final PluginManager plugins = new PluginManager();
+
     private static final long TICK_NANOS = 1_000_000_000L / TICKS_PER_SECOND;
 
     /** Drop the backlog instead of replaying a burst after a long stall. */
     private static final long MAX_BACKLOG_NANOS = TICK_NANOS * 5;
+
+    public RetroCraftServer()
+    {
+        this.plugins.register(new WelcomePlugin());
+    }
 
     public void start()
     {
@@ -54,6 +63,8 @@ public class RetroCraftServer implements Runnable
                         }
                     })
                     .sync();
+
+            ConnectionManager.INSTANCE.addJoinListener(this.plugins::firePlayerJoin);
 
             // Fixed-rate loop: the deadline advances by exactly one tick, so
             // processing time is subtracted from the sleep instead of being
