@@ -271,9 +271,12 @@ public final class GpuWorldRenderer implements AutoCloseable
             return;
 
         float scaledYaw = yaw * 100.0f;
+        float scaledPitch = -pitch * 100.0f;
 
         double cosYaw = Math.cos(scaledYaw);
         double sinYaw = Math.sin(scaledYaw);
+        double cosPitch = Math.cos(scaledPitch);
+        double sinPitch = Math.sin(scaledPitch);
 
         float baseWidth = 32.0f * 4.0f * Main.RESOLUTION_SCALE;
         float baseHeight = 64.0f * 4.0f * Main.RESOLUTION_SCALE;
@@ -303,17 +306,19 @@ public final class GpuWorldRenderer implements AutoCloseable
             if (diffY == 0.0)
                 diffY = 0.005;
 
-            // Yaw-only billboard: the screen position and size ignore camera
-            // pitch, so looking up/down does not slide the model vertically.
-            // Pitch is still used for the depth test.
+            // World-space billboard: the sprite is anchored to the player's
+            // position, so it moves with the terrain when you look up or down
+            // instead of staying pinned to the screen.
             double xx = cosYaw * diffX - sinYaw * diffZ;
             double zz = sinYaw * diffX + cosYaw * diffZ;
+            double yy = cosPitch * diffY - sinPitch * zz;
+            zz = sinPitch * diffY + cosPitch * zz;
 
-            if (zz <= 0.0)
+            if (zz < 0.0)
                 continue;
 
             float screenX = (float) (xx * focal / zz) + width * 0.5f;
-            float screenY = (float) (diffY * focal / zz) + height * 0.5f;
+            float screenY = (float) (yy * focal / zz) + height * 0.5f;
 
             glUniform2f(uSpriteCenter, screenX, screenY);
             glUniform2f(uSpriteSize, baseWidth / (float) zz, baseHeight / (float) zz);
