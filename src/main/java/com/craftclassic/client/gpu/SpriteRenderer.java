@@ -33,9 +33,7 @@ public final class SpriteRenderer implements AutoCloseable
     private final int textureWidth;
     private final int textureHeight;
 
-    private final int uColor;
     private final int uSprite;
-    private final int uTextured;
     private final int uCenter;
     private final int uSize;
     private final int uRight;
@@ -61,9 +59,7 @@ public final class SpriteRenderer implements AutoCloseable
         this.uFocal = uniform("uFocal");
         this.uResolution = uniform("uResolution");
         this.uFogDist = uniform("uFogDist");
-        this.uColor = uniform("uColor");
         this.uSprite = uniform("uSprite");
-        this.uTextured = uniform("uTextured");
 
         GlUtil.SpriteTexture sprite = GlUtil.playerSpriteTexture("player.png");
         this.texture = sprite.id;
@@ -114,9 +110,9 @@ public final class SpriteRenderer implements AutoCloseable
 
         double cy = Math.cos(scaledYaw);
         double sy = Math.sin(scaledYaw);
-        // Player rectangle: 1.2 wide, 1.8 tall, in world units.
-        float worldWidth = 1.2f;
+        // Sprite size: 1.8 tall, width from the texture aspect (max 1.2).
         float worldHeight = 1.8f;
+        float worldWidth = Math.min(1.2f, worldHeight * this.textureWidth / (float) this.textureHeight);
 
         glUseProgram(program);
 
@@ -157,23 +153,7 @@ public final class SpriteRenderer implements AutoCloseable
                     entity.getLocation().getY() + FEET_OFFSET - worldHeight * 0.5f,
                     entity.getLocation().getZ());
 
-            // Wide panel behind the model.
             glUniform2f(uSize, worldWidth, worldHeight);
-            glUniform1i(uTextured, 0);
-            glUniform4f(uColor, 0.20f, 0.22f, 0.30f, 1.0f);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-            // Bunny texture centred on the panel, preserving its aspect.
-            float modelHeight = worldHeight;
-            float modelWidth = modelHeight * this.textureWidth / (float) this.textureHeight;
-            if (modelWidth > worldWidth)
-            {
-                modelWidth = worldWidth;
-                modelHeight = modelWidth * this.textureHeight / (float) this.textureWidth;
-            }
-
-            glUniform2f(uSize, modelWidth, modelHeight);
-            glUniform1i(uTextured, 1);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         }
 
