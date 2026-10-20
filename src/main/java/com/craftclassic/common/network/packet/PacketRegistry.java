@@ -22,6 +22,7 @@ public class PacketRegistry
         map(5, BlockBreakPacket.class, BlockBreakPacket::new);
         map(6, BlockPlacePacket.class, BlockPlacePacket::new);
         map(7, ChatMessagePacket.class, ChatMessagePacket::new);
+        map(8, PingPacket.class, PingPacket::new);
     }
 
     private void map(int id, Class<? extends Packet> packetClazz, Supplier<? extends Packet> packetSupplier)

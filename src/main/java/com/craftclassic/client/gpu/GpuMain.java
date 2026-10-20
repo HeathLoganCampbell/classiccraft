@@ -9,6 +9,7 @@ import com.craftclassic.common.entities.Player;
 import com.craftclassic.common.network.ClientBridge;
 import com.craftclassic.common.network.packet.packets.ChatMessagePacket;
 import com.craftclassic.common.network.packet.packets.EntityPositionPacket;
+import com.craftclassic.common.network.packet.packets.PingPacket;
 import com.craftclassic.common.utils.Location;
 import com.craftclassic.common.utils.Vector;
 import com.craftclassic.common.world.Raycast;
@@ -604,6 +605,14 @@ public final class GpuMain implements ClientBridge.View
     }
 
     @Override
+    public void onPing(long sentNanos)
+    {
+        long millis = Math.max(0L, (System.nanoTime() - sentNanos) / 1_000_000L);
+        if (chat != null)
+            chat.addMessage("", "&aPong! " + millis + "ms");
+    }
+
+    @Override
     public void onChatMessage(String sender, String message)
     {
         if (chat != null)
@@ -617,6 +626,15 @@ public final class GpuMain implements ClientBridge.View
 
         if (text.isEmpty())
             return;
+
+        if (text.equalsIgnoreCase("/ping"))
+        {
+            if (nettyClient != null && nettyClient.isConnected())
+                nettyClient.sendPacket(new PingPacket(System.nanoTime()));
+            else
+                chat.addMessage("", "&cNot connected");
+            return;
+        }
 
         if (nettyClient != null && nettyClient.isConnected())
             nettyClient.sendPacket(new ChatMessagePacket(text));
@@ -738,8 +756,8 @@ public final class GpuMain implements ClientBridge.View
             location.setPitch(0.0f);
 
             Entity remote = new Entity("Remote", 1);
-            remote.setLocation(new Location(world, location.getX(), location.getY(),
-                    location.getZ() + 4.0f));
+            remote.setLocation(new Location(world, location.getX(), location.getY() - 2.0f,
+                    location.getZ() + 6.0f));
             world.addEntity(remote);
         }
 

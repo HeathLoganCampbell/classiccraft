@@ -19,6 +19,8 @@ public final class ClientBridge
         void addEntity(Entity entity);
 
         void onChatMessage(String sender, String message);
+
+        default void onPing(long sentNanos) {}
     }
 
     /** Set by whichever client is running; null until then. */

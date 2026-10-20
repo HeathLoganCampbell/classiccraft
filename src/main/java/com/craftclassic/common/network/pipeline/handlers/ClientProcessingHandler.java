@@ -50,6 +50,12 @@ public class ClientProcessingHandler extends SimpleChannelInboundHandler<Packet>
         if(view == null)
             return;
 
+        if(packet instanceof PingPacket)
+        {
+            view.onPing(((PingPacket) packet).getSentNanos());
+            return;
+        }
+
         if(packet instanceof ChatMessagePacket)
         {
             ChatMessagePacket chat = (ChatMessagePacket) packet;

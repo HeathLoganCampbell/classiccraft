@@ -1,6 +1,7 @@
 package com.craftclassic.common.network;
 
 import com.craftclassic.common.network.packet.Packet;
+import com.craftclassic.common.network.packet.packets.PingPacket;
 import com.craftclassic.common.network.packet.packets.PlayerConnectPacket;
 import com.craftclassic.common.network.player.PlayerConnection;
 import io.netty.channel.ChannelHandlerContext;
@@ -31,6 +32,14 @@ public class PacketProcessor
                 context.close();
                 return;
             }
+        }
+
+        // Latency probes must not wait for the 20 TPS game loop, and they
+        // touch no game state.
+        if (packet instanceof PingPacket)
+        {
+            packet.process(playerConnection);
+            return;
         }
 
         playerConnection.addPacketToQueue(packet);

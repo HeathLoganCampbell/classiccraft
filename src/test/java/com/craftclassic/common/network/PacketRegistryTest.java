@@ -5,6 +5,7 @@ import com.craftclassic.common.network.packet.PacketRegistry;
 import com.craftclassic.common.network.packet.packets.BlockBreakPacket;
 import com.craftclassic.common.network.packet.packets.BlockPlacePacket;
 import com.craftclassic.common.network.packet.packets.ChatMessagePacket;
+import com.craftclassic.common.network.packet.packets.PingPacket;
 import com.craftclassic.common.network.packet.packets.EntityPositionPacket;
 import com.craftclassic.common.network.packet.packets.EntitySpawnPacket;
 import com.craftclassic.common.network.packet.packets.PlayerConnectPacket;
@@ -49,13 +50,14 @@ class PacketRegistryTest
         assertEquals(5, registry.getPacketId(new BlockBreakPacket()));
         assertEquals(6, registry.getPacketId(new BlockPlacePacket()));
         assertEquals(7, registry.getPacketId(new ChatMessagePacket()));
+        assertEquals(8, registry.getPacketId(new PingPacket()));
     }
 
     @Test
     void unknownIdsHaveNoPacket()
     {
         assertNull(registry.createPacket(0));
-        assertNull(registry.createPacket(8));
+        assertNull(registry.createPacket(999));
         assertNull(registry.createPacket(-1));
     }
 

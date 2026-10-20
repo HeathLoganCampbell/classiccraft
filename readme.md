@@ -72,7 +72,7 @@ old key handling).
 The player name comes from `--name`, otherwise `CLASSICCRAFT_USERNAME`, otherwise
 `Player`.
 
-Server commands: `/ping`, `/msg <player> <text>` (aliases `/tell`, `/w`), `/list`, `/help`.
+Server commands: `/ping` (round-trip latency), `/msg <player> <text>` (aliases `/tell`, `/w`), `/list`, `/help`.
 
 Chat: `T` (or `/`) opens the input line, `Enter` sends, `Esc` cancels. Messages
 support Minecraft-style codes: `&0`-`&f` colours, `&l` bold, `&r` reset
