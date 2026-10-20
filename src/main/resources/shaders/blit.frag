@@ -13,6 +13,7 @@ uniform ivec2 uCrosshair;
 uniform sampler2D uChat;
 uniform int       uChatVisible;
 uniform float     uChatFraction;   // band height / low-res height
+uniform float     uChatWidth;      // band width / screen width
 
 void main()
 {
@@ -28,9 +29,10 @@ void main()
         color = 1.0 - color;        // 0xFFFFFF - pixel
 
     // Chat band: the texture's top row sits at the top of the band.
-    if (uChatVisible != 0 && vUV.y < uChatFraction)
+    if (uChatVisible != 0 && vUV.y < uChatFraction && vUV.x < uChatWidth)
     {
-        vec4 chat = texture(uChat, vec2(vUV.x, 1.0 - vUV.y / uChatFraction));
+        vec2 uv = vec2(vUV.x / uChatWidth, 1.0 - vUV.y / uChatFraction);
+        vec4 chat = texture(uChat, uv);
         color = mix(color, chat.rgb, chat.a);
     }
 
