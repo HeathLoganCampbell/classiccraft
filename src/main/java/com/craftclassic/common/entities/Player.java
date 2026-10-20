@@ -80,6 +80,7 @@ public class Player extends LivingEntity
 																		 (int) this.getTargetBlockPlace().getZ(),
 						GameSettings.placeBlockTypeId);
 				getWorld().setBlock(this.getTargetBlockPlace(), Block.getBlockById(GameSettings.placeBlockTypeId));
+				liftOutOfPlacedBlock(this.getTargetBlockPlace());
 				if (packetSink != null) packetSink.accept(blockPlacePacket);
 			}
 			Input.setMouse(MouseEvent.BUTTON3, false);
@@ -220,6 +221,32 @@ public class Player extends LivingEntity
 			if(collison) return;
 		}
 
+	}
+
+	/**
+	 * Placing a block in the cell the player occupies used to leave them stuck
+	 * inside it, which also stopped the next jump. If the new block overlaps
+	 * the body, step the player up one block so they stand on it instead
+	 * (placing under yourself while jumping is already clear of the body).
+	 */
+	private void liftOutOfPlacedBlock(Location placed)
+	{
+		Location location = this.getLocation();
+
+		int bodyX = (int) Math.floor(location.getX()) - 64;
+		int bodyY = (int) Math.floor(location.getY()) - 64;
+		int bodyZ = (int) Math.floor(location.getZ()) - 64;
+
+		boolean overlapsBody = placed.getX() == bodyX
+				&& placed.getZ() == bodyZ
+				&& (placed.getY() == bodyY || placed.getY() == bodyY + 1);
+
+		if(!overlapsBody)
+			return;
+
+		location.setY(location.getY() - 1.0f);   // y grows downwards
+		this.getVelocity().setY(0.0f);
+		this.setOnGround(false);
 	}
 
 	public Location getTargetBlockPlace() {
