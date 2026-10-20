@@ -11,6 +11,7 @@ public class LavaBlock extends Block {
 		this.setSelectable(false);
 		this.setSolid(false);
 		this.setTicking(true);
+		this.setLiquid(true);
 	}
 	
 	private void flow(Location location, int x, int y, int z)

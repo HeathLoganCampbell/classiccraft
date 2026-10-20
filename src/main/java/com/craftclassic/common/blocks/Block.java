@@ -17,6 +17,7 @@ public class Block
 	private boolean solid = true;
 	private boolean selectable = true;
 	private boolean ticking = false;
+	private boolean liquid = false;
 	
 	public Block(int id, String name, int textureId) {
 		super();
@@ -123,6 +124,15 @@ public class Block
 
 	public void setTicking(boolean ticking) {
 		this.ticking = ticking;
+	}
+
+	/** Liquids are not a placement surface, but their cell can be replaced. */
+	public boolean isLiquid() {
+		return liquid;
+	}
+
+	public void setLiquid(boolean liquid) {
+		this.liquid = liquid;
 	}
 
 	public void setPhysics(boolean physics) {
