@@ -68,7 +68,9 @@ Controls are the same as the CPU client. `Esc` quits, `F2` toggles the debug
 window title, left/right arrows cycle the block type (and turn, matching the
 old key handling).
 
-Chat: `T` (or `/`) opens the input line, `Enter` sends, `Esc` cancels. Run the
+Chat: `T` (or `/`) opens the input line, `Enter` sends, `Esc` cancels. Messages
+support Minecraft-style codes: `&0`-`&f` colours, `&l` bold, `&r` reset
+(for example `&cRED &lBOLD`). Run the
 server with `./run-server.sh` first; clients join with `--server`. If no server
 is reachable the game stays single-player and chat lines stay local.
 
@@ -170,7 +172,7 @@ Because it sounded better
 ![ClassicCraft v1.1](./readme-resources/classiccraft-v1.1.png)
 * Internal resolution raised 30%, to 413x260 with the same field of view
 * Transparent, animated water (the floor is visible through shallow water)
-* Chat: `T` to talk, with a server broadcast and a bitmap-font overlay
+* Chat: `T` to talk, server broadcast, bitmap font, and `&0`-`&f` / `&l` colour codes
 * Movement decoupled from the frame rate: fixed 60 ticks/s, `--tps`/`--speed`
 * Air movement reworked: jumps can be steered instead of feeling ballistic
 * Placement is refused inside the player; jump to place underneath yourself

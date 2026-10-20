@@ -684,10 +684,10 @@ public final class GpuMain implements ClientBridge.View
 
         if (chatDemo)
         {
-            chat.addMessage("STEVE", "HELLO FROM THE SERVER");
-            chat.addMessage("ALEX", "THE NEW CHAT WORKS");
+            chat.addMessage("STEVE", "&aHELLO &lFROM &r&cTHE SERVER");
+            chat.addMessage("ALEX", "&eTHIS &cIS &9CLASSICCRAFT");
             chat.setOpen(true);
-            chat.append("TYPING A MESSAGE");
+            chat.append("&cCOLOUR &lTEST");
             chat.update();
         }
 

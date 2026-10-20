@@ -88,7 +88,14 @@ void main()
             {
                 // Internal boundary between two water cells: draw no face, so
                 // the water volume does not show vertical "walls" as the ray
-                // steps from cell to cell.
+                // steps from cell to cell. A small tint keeps deep water from
+                // washing out against the sky.
+                vec3 tint = vec3(0.43, 0.29, 0.93);
+                color    += (1.0 - coverage) * 0.08 * tint;
+                coverage += (1.0 - coverage) * 0.08;
+
+                if (coverage > 0.95)
+                    break;
             }
             else
             {

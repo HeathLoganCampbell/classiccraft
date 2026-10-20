@@ -38,6 +38,15 @@ public final class ChatOverlay implements AutoCloseable
     private static final int TEXT = 0xFFFFFFFF;
     private static final int INPUT_TEXT = 0xFFFFFF00;
 
+    /** Minecraft chat colours, 0-f. Alpha is forced opaque. */
+    private static final int[] COLOURS =
+    {
+            0xFF000000, 0xFF0000AA, 0xFF00AA00, 0xFF00AAAA,
+            0xFFAA0000, 0xFFAA00AA, 0xFFFFAA00, 0xFFAAAAAA,
+            0xFF555555, 0xFF5555FF, 0xFF55FF55, 0xFF55FFFF,
+            0xFFFF5555, 0xFFFF55FF, 0xFFFFFF55, 0xFFFFFFFF
+    };
+
     private final int width;
     private final int height;
     private final int fontWidth;
@@ -205,7 +214,7 @@ public final class ChatOverlay implements AutoCloseable
             // Cursor: the font has no underscore, so draw a small block.
             if (cursorVisible)
             {
-                int cursorX = 4 + prompt.length() * ADVANCE;
+                int cursorX = 4 + visualLength(prompt) * ADVANCE;
                 for (int y = inputY; y < inputY + GLYPH_HEIGHT; y++)
                     putPixel(cursorX, y, INPUT_TEXT);
             }
@@ -225,20 +234,67 @@ public final class ChatOverlay implements AutoCloseable
         }
     }
 
-    private void drawText(int startX, int startY, String text, int colour)
+    private void drawText(int startX, int startY, String text, int baseColour)
     {
         String upper = text.toUpperCase();
-
         int x = startX;
+        int colour = baseColour;
+        boolean bold = false;
+
         for (int i = 0; i < upper.length(); i++)
         {
             if (x + GLYPH_WIDTH > width - 2)
                 break;
 
-            int index = FONT_CHARS.indexOf(upper.charAt(i));
+            char character = upper.charAt(i);
+
+            if (character == '&' && i + 1 < upper.length())
+            {
+                char code = Character.toLowerCase(upper.charAt(i + 1));
+
+                if (code >= '0' && code <= '9')
+                {
+                    colour = COLOURS[code - '0'];
+                    bold = false;
+                    i++;
+                    continue;
+                }
+
+                if (code >= 'a' && code <= 'f')
+                {
+                    colour = COLOURS[10 + (code - 'a')];
+                    bold = false;
+                    i++;
+                    continue;
+                }
+
+                if (code == 'l')
+                {
+                    bold = true;
+                    i++;
+                    continue;
+                }
+
+                if (code == 'r')
+                {
+                    colour = baseColour;
+                    bold = false;
+                    i++;
+                    continue;
+                }
+
+                // Effects we do not render (k, m, n, o) are consumed silently.
+                if (code == 'k' || code == 'm' || code == 'n' || code == 'o')
+                {
+                    i++;
+                    continue;
+                }
+            }
+
+            int index = FONT_CHARS.indexOf(character);
             if (index < 0)
             {
-                if (upper.charAt(i) == ' ')
+                if (character == ' ')
                 {
                     x += ADVANCE;
                     continue;
@@ -249,18 +305,55 @@ public final class ChatOverlay implements AutoCloseable
             int glyphX = (index % 26) * GLYPH_WIDTH;
             int glyphY = (index / 26) * GLYPH_HEIGHT;
 
-            for (int py = 0; py < GLYPH_HEIGHT; py++)
-            {
-                for (int px = 0; px < GLYPH_WIDTH; px++)
-                {
-                    int source = fontPixels[(glyphX + px) + (glyphY + py) * fontWidth];
-                    if ((source & 0xFFFFFF) != 0)
-                        putPixel(x + px, startY + py, colour);
-                }
-            }
+            drawGlyph(x, startY, glyphX, glyphY, colour);
+
+            if (bold)
+                drawGlyph(x + 1, startY, glyphX, glyphY, colour);
 
             x += ADVANCE;
         }
+    }
+
+    private void drawGlyph(int x, int y, int glyphX, int glyphY, int colour)
+    {
+        for (int py = 0; py < GLYPH_HEIGHT; py++)
+        {
+            for (int px = 0; px < GLYPH_WIDTH; px++)
+            {
+                int source = fontPixels[(glyphX + px) + (glyphY + py) * fontWidth];
+                if ((source & 0xFFFFFF) != 0)
+                    putPixel(x + px, y + py, colour);
+            }
+        }
+    }
+
+    /** Characters that actually render; used to position the cursor. */
+    private static int visualLength(String text)
+    {
+        String upper = text.toUpperCase();
+        int length = 0;
+
+        for (int i = 0; i < upper.length(); i++)
+        {
+            if (upper.charAt(i) == '&' && i + 1 < upper.length() && isCode(upper.charAt(i + 1)))
+            {
+                i++;
+                continue;
+            }
+
+            length++;
+        }
+
+        return length;
+    }
+
+    private static boolean isCode(char character)
+    {
+        char code = Character.toLowerCase(character);
+        return (code >= '0' && code <= '9')
+                || (code >= 'a' && code <= 'f')
+                || code == 'l' || code == 'r'
+                || code == 'k' || code == 'm' || code == 'n' || code == 'o';
     }
 
     private void putPixel(int x, int y, int argb)
