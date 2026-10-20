@@ -221,32 +221,6 @@ final class GlUtil
                     background[i] = true;
             }
 
-            // 3. Trim one-pixel protrusions (the 1 px ear tips in player.png).
-            boolean[] trim = new boolean[argb.length];
-            for (int i = 0; i < argb.length; i++)
-            {
-                if (background[i])
-                    continue;
-
-                int x = i % width;
-                int y = i / width;
-                int opaque = 0;
-
-                if (x > 0 && !background[i - 1]) opaque++;
-                if (x + 1 < width && !background[i + 1]) opaque++;
-                if (y > 0 && !background[i - width]) opaque++;
-                if (y + 1 < height && !background[i + width]) opaque++;
-
-                if (opaque <= 1)
-                    trim[i] = true;
-            }
-
-            for (int i = 0; i < argb.length; i++)
-            {
-                if (trim[i])
-                    background[i] = true;
-            }
-
             // 4. Brighten dark silhouette-edge pixels. The source art outlines
             //    the ears in black; at 5 px wide that reads as a clipped tip.
             int[] shaded = argb.clone();
