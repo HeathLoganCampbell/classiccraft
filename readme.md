@@ -47,8 +47,9 @@ right arrow key = changed block placed
 
 The world renderer can also run on the GPU. It is the same raycaster, ported to
 a fragment shader: the 64x64x64 block array becomes a 256 KB `R8UI` 3D texture,
-`World.render()` becomes `shaders/raycast.frag`, and the result is still drawn
-at 318x200 and nearest-upscaled, so the look is unchanged.
+`World.render()` becomes `shaders/raycast.frag`, and the result is drawn at
+413x260 and nearest-upscaled to 1239x780. `Main.FOCAL` scales with the
+resolution, so the field of view is unchanged; only the detail increases.
 
 The CPU renderer is untouched and remains the reference implementation; this is
 an optional backend, not a replacement.
@@ -67,7 +68,7 @@ old key handling).
 
 Requires LWJGL 3 and a GPU with OpenGL 3.3+; on macOS the script passes
 `-XstartOnFirstThread`. Measured on an M1 Pro through Metal-backed OpenGL 4.1:
-**0.36-0.52 ms/frame** at 318x200 (~2,000-2,700 fps serialised).
+**0.58 ms/frame** at 413x260 (~1,700 fps serialised).
 
 The simulation runs at a fixed **60 ticks/second**, decoupled from the display, and
 movement is compensated for the tick rate so `--tps` changes smoothness, not speed.

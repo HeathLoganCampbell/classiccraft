@@ -30,6 +30,7 @@ public final class GpuWorldRenderer implements AutoCloseable
 
     private final int width;
     private final int height;
+    private final float focal;
 
     private final int framebuffer;
     private final int colorTexture;
@@ -49,6 +50,7 @@ public final class GpuWorldRenderer implements AutoCloseable
     private final int uPitch;
     private final int uResolution;
     private final int uFov;
+    private final int uFocal;
     private final int uFogDist;
     private final int uSky;
     private final int uTarget;
@@ -62,10 +64,11 @@ public final class GpuWorldRenderer implements AutoCloseable
     private int uploadCount;
     private int targetX = -1, targetY = -1, targetZ = -1;
 
-    public GpuWorldRenderer(int width, int height)
+    public GpuWorldRenderer(int width, int height, float focal)
     {
         this.width = width;
         this.height = height;
+        this.focal = focal;
 
         this.raycastProgram = GlUtil.program("shaders/fullscreen.vert", "shaders/raycast.frag");
         this.blitProgram = GlUtil.program("shaders/fullscreen.vert", "shaders/blit.frag");
@@ -79,6 +82,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         this.uPitch = uniform(raycastProgram, "uPitch");
         this.uResolution = uniform(raycastProgram, "uResolution");
         this.uFov = uniform(raycastProgram, "uFov");
+        this.uFocal = uniform(raycastProgram, "uFocal");
         this.uFogDist = uniform(raycastProgram, "uFogDist");
         this.uSky = uniform(raycastProgram, "uSky");
         this.uTarget = uniform(raycastProgram, "uTarget");
@@ -169,6 +173,7 @@ public final class GpuWorldRenderer implements AutoCloseable
         glUniform1f(uPitch, pitch * 100.0f);
         glUniform2f(uResolution, width, height);
         glUniform1f(uFov, fov);
+        glUniform1f(uFocal, focal);
         glUniform1f(uFogDist, 50.0f);
         glUniform3f(uSky, 0xA7 / 255.0f, 0xC9 / 255.0f, 0xEB / 255.0f);
         glUniform3i(uTarget, targetX, targetY, targetZ);

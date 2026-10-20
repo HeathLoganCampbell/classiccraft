@@ -217,7 +217,7 @@ public class World implements IWorld
 
 		for (int screenX = 0; screenX < pixelWidth; screenX++)
 		{
-			float vpixelLoc = (float)(screenX - pixelHalfWidth) / 90.0f;
+			float vpixelLoc = (float)(screenX - pixelHalfWidth) / Main.FOCAL;
 
 			//number of lines to render, horzontial
 			for(int screenY = 0; screenY < pixelHeight; screenY++)
@@ -229,7 +229,7 @@ public class World implements IWorld
 				int maxSkyboxColour = 255;
 				double fogOfWar = 50.0; // render distance
 
-				float hpixelLoc = (float)(screenY - pixelHalfHeight) / 90.0f;
+				float hpixelLoc = (float)(screenY - pixelHalfHeight) / Main.FOCAL;
 
 				//rotation matrix
 				float rotateZZ = fov * cosPitch + hpixelLoc * sinPitch;
@@ -426,8 +426,8 @@ public class World implements IWorld
 
 	private void renderSprite(double x, double y, double z)
 	{
-		int height = 64 * 4;
-		int width = 32 * 4;
+		int height = (int) (64 * 4 * Main.RESOLUTION_SCALE);
+		int width = (int) (32 * 4 * Main.RESOLUTION_SCALE);
 
 		int textureHeight = 64;
 		int textureWidth = 32;
@@ -456,8 +456,8 @@ public class World implements IWorld
 
 		if(zz < 0) return;
 
-		int screenX = (int) ((xx * (double) 90 / zz) + Main.WIDTH / 2);
-		int screenY = (int) ((yy * (double) 90 / zz) + Main.HEIGHT / 2);
+		int screenX = (int) ((xx * (double) Main.FOCAL / zz) + Main.WIDTH / 2);
+		int screenY = (int) ((yy * (double) Main.FOCAL / zz) + Main.HEIGHT / 2);
 
 		if(screenX < 0 || screenX > Main.WIDTH) return;
 		if(screenY < 0 || screenY > Main.HEIGHT) return;

@@ -43,9 +43,11 @@ implementation.
   voxel DDA, samples the atlas with the same face rules, and applies the same
   face shade and fog. It writes colour plus ray distance, replacing
   `World.zBuffer`.
-- The world renders into a 318x200 RGBA8 target and is nearest-upscaled to the
-  window (`shaders/blit.frag`), which also draws the crosshair. The pixelated
-  look is preserved; resolution is now a choice rather than a budget.
+- The world renders into a 413x260 RGBA8 target (30% more than the CPU path's
+  318x200 on each axis) and is nearest-upscaled to the window
+  (`shaders/blit.frag`), which also draws the crosshair. `Main.FOCAL` scales
+  with the resolution, so raising it adds detail without widening the field of
+  view. Resolution is now a choice rather than a budget.
 - The simulation runs at a fixed 60 ticks/second (the rate the old
   frame-bound loop averaged), decoupled from the refresh rate. `--tps` changes
   the rate and `--speed` scales movement; `Player.tick` compensates motion for
@@ -85,9 +87,9 @@ pixel in both backends.
 
 **Positive**
 
-- Rendering is no longer the bottleneck: 0.36-0.52 ms/frame at 318x200 on an
-  M1 Pro through Metal-backed OpenGL 4.1 (~2,000-2,700 fps when serialised),
-  versus a CPU path that has to fight for 60.
+- Rendering is no longer the bottleneck: 0.58 ms/frame at 413x260 on an M1 Pro
+  through Metal-backed OpenGL 4.1 (~1,700 fps when serialised), versus a CPU
+  path that has to fight for 60.
 - The render distance is a constant, not a function of the first hit.
 - The CPU renderer stays in the tree as an oracle: both can be rendered from
   the same world and camera and compared. The residual difference is sub-texel

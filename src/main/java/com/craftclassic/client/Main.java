@@ -15,10 +15,19 @@ import java.util.logging.Logger;
 
 
 public class Main {
-	public static final int WIDTH = 318;
-	public static final int HEIGHT = 200;
+	public static final int WIDTH = 413;
+	public static final int HEIGHT = 260;
 
-	public static final int SCALE = 4;
+	public static final int SCALE = 3;
+
+	/** Internal resolution relative to the original 318x200. */
+	public static final float RESOLUTION_SCALE = WIDTH / 318.0f;
+
+	/**
+	 * Pixels per screen unit at the centre of the view. Scaling this with the
+	 * resolution keeps the field of view fixed instead of widening it.
+	 */
+	public static final float FOCAL = 90.0f * RESOLUTION_SCALE;
 	public static final String TITLE = "ClassicCraft";
 
 	public static void main(String[] av) {

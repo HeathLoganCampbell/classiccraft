@@ -112,7 +112,7 @@ public final class GpuMain
             initWorld(seed, naturalTerrain);
             initInput();
 
-            renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT);
+            renderer = new GpuWorldRenderer(Main.WIDTH, Main.HEIGHT, Main.FOCAL);
 
             System.out.println("Renderer: " + glGetString(GL_RENDERER));
             System.out.println("OpenGL:   " + glGetString(GL_VERSION));

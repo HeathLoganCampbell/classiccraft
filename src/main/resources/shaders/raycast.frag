@@ -20,6 +20,7 @@ uniform float uYaw;             // already multiplied by 100, as in World.render
 uniform float uPitch;           // already multiplied by 100
 uniform vec2  uResolution;
 uniform float uFov;
+uniform float uFocal;
 uniform float uFogDist;
 uniform vec3  uSky;
 uniform ivec3 uTarget;          // targeted block; x < 0 means none
@@ -32,7 +33,7 @@ void main()
 {
     // World.render() advances screenY downwards; gl_FragCoord.y goes up.
     vec2 fc = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
-    vec2 p  = (fc - uResolution * 0.5) / 90.0;
+    vec2 p  = (fc - uResolution * 0.5) / uFocal;
 
     float cy = cos(uYaw),   sy = sin(uYaw);
     float cp = cos(uPitch), sp = sin(uPitch);
