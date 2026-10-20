@@ -306,20 +306,25 @@ public final class GpuWorldRenderer implements AutoCloseable
             if (diffY == 0.0)
                 diffY = 0.005;
 
+            // Yaw-only billboard: the screen position and size ignore camera
+            // pitch, so looking up/down does not slide the model vertically.
+            // Pitch is still used for the depth test.
             double xx = cosYaw * diffX - sinYaw * diffZ;
             double zz = sinYaw * diffX + cosYaw * diffZ;
-            double yy = cosPitch * diffY - sinPitch * zz;
-            zz = sinPitch * diffY + cosPitch * zz;
 
-            if (zz < 0.0)
+            if (zz <= 0.0)
+                continue;
+
+            double depth = sinPitch * diffY + cosPitch * zz;
+            if (depth < 0.0)
                 continue;
 
             float screenX = (float) (xx * focal / zz) + width * 0.5f;
-            float screenY = (float) (yy * focal / zz) + height * 0.5f;
+            float screenY = (float) (diffY * focal / zz) + height * 0.5f;
 
             glUniform2f(uSpriteCenter, screenX, screenY);
             glUniform2f(uSpriteSize, baseWidth / (float) zz, baseHeight / (float) zz);
-            glUniform1f(uSpriteZ, (float) zz);
+            glUniform1f(uSpriteZ, (float) depth);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 
