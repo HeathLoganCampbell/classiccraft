@@ -86,6 +86,10 @@ public final class GpuMain implements ClientBridge.View
     private int serverPort = NettyClient.DEFAULT_PORT;
     private String playerName = null;
     private boolean chatDemo = false;
+    private int windowWidth = Main.WIDTH * Main.SCALE;
+    private int windowHeight = Main.HEIGHT * Main.SCALE;
+    private int windowX = Integer.MIN_VALUE;
+    private int windowY = 0;
     private boolean waterDemo = false;
     private double exitAfterSeconds = -1.0;
     private double openChatAfterSeconds = -1.0;
@@ -150,6 +154,18 @@ public final class GpuMain implements ClientBridge.View
                 case "--chat-demo":
                     chatDemo = true;
                     break;
+                case "--window-size":
+                    String size = args[++i];
+                    int cross = size.indexOf('x');
+                    windowWidth = Integer.parseInt(size.substring(0, cross));
+                    windowHeight = Integer.parseInt(size.substring(cross + 1));
+                    break;
+                case "--pos":
+                    String position = args[++i];
+                    int comma = position.indexOf(',');
+                    windowX = Integer.parseInt(position.substring(0, comma));
+                    windowY = Integer.parseInt(position.substring(comma + 1));
+                    break;
                 case "--water-demo":
                     waterDemo = true;
                     break;
@@ -207,7 +223,7 @@ public final class GpuMain implements ClientBridge.View
             System.out.println("Renderer: " + glGetString(GL_RENDERER));
             System.out.println("OpenGL:   " + glGetString(GL_VERSION));
             System.out.println("Target:   " + Main.WIDTH + "x" + Main.HEIGHT
-                    + " -> " + (Main.WIDTH * Main.SCALE) + "x" + (Main.HEIGHT * Main.SCALE));
+                    + " -> " + this.windowWidth + "x" + this.windowHeight);
             System.out.println("Name:     " + playerName);
             System.out.println("World:    " + (naturalTerrain ? "natural" : "flat") + ", seed " + seed);
             System.out.println("Sim:      " + ticksPerSecond + " ticks/s, speed x" + speedMultiplier);
@@ -253,7 +269,7 @@ public final class GpuMain implements ClientBridge.View
         glfwWindowHint(GLFW_VISIBLE, hidden ? GLFW_FALSE : GLFW_TRUE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-        window = glfwCreateWindow(Main.WIDTH * Main.SCALE, Main.HEIGHT * Main.SCALE,
+        window = glfwCreateWindow(this.windowWidth, this.windowHeight,
                 "ClassicCraft (GPU)", NULL, NULL);
 
         if (window == NULL)
@@ -264,12 +280,19 @@ public final class GpuMain implements ClientBridge.View
 
         if (!hidden)
         {
-            GLFWVidMode mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-            if (mode != null)
+            if (this.windowX != Integer.MIN_VALUE)
             {
-                glfwSetWindowPos(window,
-                        (mode.width() - Main.WIDTH * Main.SCALE) / 2,
-                        (mode.height() - Main.HEIGHT * Main.SCALE) / 2);
+                glfwSetWindowPos(window, this.windowX, this.windowY);
+            }
+            else
+            {
+                GLFWVidMode mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+                if (mode != null)
+                {
+                    glfwSetWindowPos(window,
+                            (mode.width() - this.windowWidth) / 2,
+                            (mode.height() - this.windowHeight) / 2);
+                }
             }
 
             glfwShowWindow(window);
@@ -514,7 +537,7 @@ public final class GpuMain implements ClientBridge.View
                     glfwSetWindowTitle(window, String.format(
                             "ClassicCraft (GPU) - %dx%d -> %dx%d - %d fps - %d tps - %.1f %.1f %.1f - %s",
                             Main.WIDTH, Main.HEIGHT,
-                            Main.WIDTH * Main.SCALE, Main.HEIGHT * Main.SCALE,
+                            this.windowWidth, this.windowHeight,
                             fpsFrames, ticksPerSecond,
                             location.getX(), location.getY(), location.getZ(),
                             com.craftclassic.common.blocks.Block
