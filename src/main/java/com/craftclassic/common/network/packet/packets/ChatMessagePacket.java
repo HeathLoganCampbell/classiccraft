@@ -26,6 +26,12 @@ public class ChatMessagePacket extends Packet
         this.message = message;
     }
 
+    public ChatMessagePacket(String sender, String message)
+    {
+        this.sender = sender;
+        this.message = message;
+    }
+
     @Override
     public void decode(ByteBuf buf)
     {
@@ -45,6 +51,10 @@ public class ChatMessagePacket extends Packet
     {
         Player player = playerConnection.getPlayer();
         if(player == null)
+            return;
+
+        // Slash commands are handled by the server, not broadcast.
+        if(ConnectionManager.INSTANCE.handleCommand(player, this.message))
             return;
 
         this.sender = player.getName();

@@ -5,6 +5,7 @@ import com.craftclassic.common.network.ConnectionManager;
 import com.craftclassic.common.network.packet.Packet;
 import com.craftclassic.common.network.pipeline.ServerNettyPipeline;
 import com.craftclassic.common.network.player.PlayerConnection;
+import com.craftclassic.server.command.CommandManager;
 import com.craftclassic.server.plugin.PluginManager;
 import com.craftclassic.server.plugin.WelcomePlugin;
 import io.netty.bootstrap.ServerBootstrap;
@@ -33,6 +34,7 @@ public class RetroCraftServer implements Runnable
     public RetroCraftServer()
     {
         this.plugins.register(new WelcomePlugin());
+        ConnectionManager.INSTANCE.setCommandHandler(CommandManager::handle);
     }
 
     public void start()

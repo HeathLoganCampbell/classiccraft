@@ -19,6 +19,49 @@ public class ConnectionManager
 
     private final Map<PlayerConnection, Player> connectionPlayerMap = new ConcurrentHashMap<>();
     private final List<Consumer<Player>> joinListeners = new CopyOnWriteArrayList<>();
+    private volatile CommandHandler commandHandler;
+
+    @FunctionalInterface
+    public interface CommandHandler
+    {
+        boolean handle(Player player, String message);
+    }
+
+    public void setCommandHandler(CommandHandler handler)
+    {
+        this.commandHandler = handler;
+    }
+
+    public boolean handleCommand(Player player, String message)
+    {
+        CommandHandler handler = this.commandHandler;
+        return handler != null && handler.handle(player, message);
+    }
+
+    public Player findPlayer(String name)
+    {
+        for(Player player : this.connectionPlayerMap.values())
+        {
+            if(player.getName().equalsIgnoreCase(name))
+                return player;
+        }
+        return null;
+    }
+
+    public String playerNames()
+    {
+        if(this.connectionPlayerMap.isEmpty())
+            return "(none)";
+
+        StringBuilder names = new StringBuilder();
+        for(Player player : this.connectionPlayerMap.values())
+        {
+            if(names.length() > 0)
+                names.append(", ");
+            names.append(player.getName());
+        }
+        return names.toString();
+    }
 
     public void startPlayer(PlayerConnection playerConnection, String username)
     {
