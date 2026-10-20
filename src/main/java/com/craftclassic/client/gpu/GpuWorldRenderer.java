@@ -317,11 +317,18 @@ public final class GpuWorldRenderer implements AutoCloseable
             if (zz < 0.0)
                 continue;
 
+            // Size by the distance from the camera (rotation-invariant), not
+            // the view-axis depth. A billboard keeps its world size while the
+            // camera pitches; only its projected position moves.
+            double distance = Math.sqrt(xx * xx + yy * yy + zz * zz);
+            if (distance < 0.001)
+                continue;
+
             float screenX = (float) (xx * focal / zz) + width * 0.5f;
             float screenY = (float) (yy * focal / zz) + height * 0.5f;
 
             glUniform2f(uSpriteCenter, screenX, screenY);
-            glUniform2f(uSpriteSize, baseWidth / (float) zz, baseHeight / (float) zz);
+            glUniform2f(uSpriteSize, baseWidth / (float) distance, baseHeight / (float) distance);
             glUniform1f(uSpriteZ, (float) zz);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
